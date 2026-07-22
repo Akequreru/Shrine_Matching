@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shrine_matching/pages/matching.dart';
 
 class TypePage extends StatelessWidget {
   const TypePage({super.key});
@@ -69,25 +70,25 @@ class _TypePageWidgetState extends State<TypePageWidget> {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: RichText(
                       textAlign: TextAlign.center,
-                      text: TextSpan(
-                        style: const TextStyle(color: Colors.black87, fontSize: 16),
+                      text: const TextSpan(
+                        style: TextStyle(color: Colors.black87, fontSize: 16),
                         children: [
-                          const TextSpan(text: 'Rich text supports mixed formatting like '),
-                          const TextSpan(
+                          TextSpan(text: 'Rich text supports mixed formatting like '),
+                          TextSpan(
                             text: 'bold',
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          const TextSpan(text: ', '),
-                          const TextSpan(
+                          TextSpan(text: ', '),
+                          TextSpan(
                             text: 'italics',
                             style: TextStyle(fontStyle: FontStyle.italic),
                           ),
-                          const TextSpan(text: ', and '),
-                          const TextSpan(
+                          TextSpan(text: ', and '),
+                          TextSpan(
                             text: 'underline',
                             style: TextStyle(decoration: TextDecoration.underline),
                           ),
-                          const TextSpan(text: ' inside one paragraph.'),
+                          TextSpan(text: ' inside one paragraph.'),
                         ],
                       ),
                     ),
@@ -102,7 +103,11 @@ class _TypePageWidgetState extends State<TypePageWidget> {
                       ),
                     ),
                     onPressed: () {
-                      debugPrint('Matching button pressed');
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const MatchingPage(),
+                        ),
+                      );
                     },
                     child: const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
