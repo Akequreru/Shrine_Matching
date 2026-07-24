@@ -1,27 +1,43 @@
 import 'package:flutter/material.dart';
-import 'package:shrine_matching/pages/matching.dart';
+import 'package:shrine_matching/pages/typeInfo.dart';
 
-class TypePage extends StatelessWidget {
+class TypePage extends StatefulWidget {
   const TypePage({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return const TypePageWidget();
-  }
-}
-
-class TypePageWidget extends StatefulWidget {
-  const TypePageWidget({super.key});
-
-  static String routeName = 'TypePage';
-  static String routePath = '/typePage';
+  static String routeName = 'Type';
+  static String routePath = '/type';
 
   @override
-  State<TypePageWidget> createState() => _TypePageWidgetState();
+  State<TypePage> createState() => _TypePageState();
 }
 
-class _TypePageWidgetState extends State<TypePageWidget> {
+class _TypePageState extends State<TypePage> {
   final scaffoldKey = GlobalKey<ScaffoldState>();
+
+  static const List<String> _cardTitles = [
+    'Hello World',
+    'Hello World',
+    'Hello World',
+    'Hello World',
+    'Hello World',
+    'Hello World',
+    'Hello World',
+    'Hello World',
+    'Hello World',
+    'Hello World',
+    'Hello World',
+    'Hello World',
+    'Hello World',
+    'Hello World',
+    'Hello World',
+    'Hello World',
+  ];
+
+  void _openTypeInfoPage() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const TypeInfoPage()));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,88 +50,65 @@ class _TypePageWidgetState extends State<TypePageWidget> {
         key: scaffoldKey,
         backgroundColor: Colors.white,
         body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      'https://picsum.photos/seed/48/601',
-                      width: 300,
-                      height: 300,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Sample Type',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Short description for this type\nConcept copy can go here.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: RichText(
-                      textAlign: TextAlign.center,
-                      text: const TextSpan(
-                        style: TextStyle(color: Colors.black87, fontSize: 16),
-                        children: [
-                          TextSpan(text: 'Rich text supports mixed formatting like '),
-                          TextSpan(
-                            text: 'bold',
-                            style: TextStyle(fontWeight: FontWeight.bold),
+          top: true,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(10, 0, 10, 0),
+            child: Column(
+              mainAxisSize: MainAxisSize.max,
+              children: [
+                Expanded(
+                  child: GridView.builder(
+                    padding: EdgeInsets.zero,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: 1,
+                        ),
+                    itemCount: _cardTitles.length,
+                    itemBuilder: (context, index) {
+                      return InkWell(
+                        onTap: _openTypeInfoPage,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Card(
+                          clipBehavior: Clip.antiAliasWithSaveLayer,
+                          color: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          TextSpan(text: ', '),
-                          TextSpan(
-                            text: 'italics',
-                            style: TextStyle(fontStyle: FontStyle.italic),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.max,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    'https://picsum.photos/seed/8/600',
+                                    width: 200,
+                                    height: 111.8,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                Text(
+                                  _cardTitles[index],
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    letterSpacing: 0,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          TextSpan(text: ', and '),
-                          TextSpan(
-                            text: 'underline',
-                            style: TextStyle(decoration: TextDecoration.underline),
-                          ),
-                          TextSpan(text: ' inside one paragraph.'),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFDB4713),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(50),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const MatchingPage(),
                         ),
                       );
                     },
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      child: Text('Start Matching'),
-                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),

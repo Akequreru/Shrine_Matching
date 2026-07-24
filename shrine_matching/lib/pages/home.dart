@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shrine_matching/pages/userType.dart';
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
@@ -30,10 +31,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   const Text(
                     'Shrine Matching',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
                   ClipRRect(
@@ -61,10 +59,15 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                       ),
                     ),
                     onPressed: () {
-                      debugPrint('Home button pressed');
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const UserTypePage()),
+                      );
                     },
                     child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       child: Text('Find my shrine type'),
                     ),
                   ),
