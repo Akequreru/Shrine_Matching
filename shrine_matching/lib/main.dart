@@ -8,12 +8,7 @@ import 'package:shrine_matching/pages/map.dart';
 import 'package:shrine_matching/pages/bookmark.dart';
 
 void main() {
-  runApp(
-    DevicePreview(
-      enabled: true,
-      builder: (context) => const MyApp(),
-    ),
-  );
+  runApp(DevicePreview(enabled: true, builder: (context) => const MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -35,26 +30,42 @@ class RootTabsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return CupertinoTabScaffold(
       tabBar: CupertinoTabBar(
+        activeColor: Color(0xFFDB4713),
         items: [
           BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.house_fill),
-            label: 'Home',
+            icon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Icon(CupertinoIcons.house_fill),
+            ),
+            label: '',
           ),
           BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.square_grid_2x2_fill),
-            label: 'Type',
+            icon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Icon(CupertinoIcons.square_grid_2x2_fill),
+            ),
+            label: '',
           ),
           BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.map_fill),
-            label: 'Map'
+            icon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Icon(CupertinoIcons.map_fill),
+            ),
+            label: '',
           ),
           BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.bookmark_fill),
-            label: 'Bookmark',
+            icon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Icon(CupertinoIcons.bookmark_fill),
+            ),
+            label: '',
           ),
           BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.person_fill),
-            label: 'Profile',
+            icon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Icon(CupertinoIcons.person_fill),
+            ),
+            label: '',
           ),
         ],
       ),
