@@ -2,20 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:device_preview/device_preview.dart';
 import 'package:shrine_matching/pages/home.dart';
-<<<<<<< HEAD
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(
-    DevicePreview(
-      enabled: true,
-      builder: (context) => const MyApp(), // Wrap your app
-    ),
-  );
-=======
 import 'package:shrine_matching/pages/profile.dart';
 import 'package:shrine_matching/pages/type.dart';
 import 'package:shrine_matching/pages/map.dart';
@@ -23,7 +12,6 @@ import 'package:shrine_matching/pages/bookmark.dart';
 
 void main() {
   runApp(DevicePreview(enabled: true, builder: (context) => const MyApp()));
->>>>>>> origin
 }
 
 class MyApp extends StatelessWidget {
@@ -37,8 +25,6 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-<<<<<<< HEAD
-=======
 
 class RootTabsPage extends StatelessWidget {
   const RootTabsPage({super.key});
@@ -105,4 +91,3 @@ class RootTabsPage extends StatelessWidget {
     );
   }
 }
->>>>>>> origin
