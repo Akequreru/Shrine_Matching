@@ -8,7 +8,7 @@ class Question {
   factory Question.fromFirestore(Map<String, dynamic> data, String documentId) {
     return Question(
       id: documentId,
-      content: data['content'] ?? '', // データが無い場合は空文字にする安全対策
+      content: data['content'] ?? '', 
       value: data['value'] ?? 0,
     );
   }
