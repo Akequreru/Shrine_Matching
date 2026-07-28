@@ -4,6 +4,7 @@ import '../models/question.dart';
 import '../models/app_user.dart';
 import '../models/kami.dart';     // ★変更：kami.dart
 import '../models/history.dart';  // ★変更：history.dart
+import '../models/type_info.dart';
 
 class FirestoreService {
   // Firestoreのインスタンス（通信窓口）を変数にしておく
@@ -88,27 +89,26 @@ class FirestoreService {
   // ==========================================
   Future<List<Shrine>> getShrinesWithKami() async {
     final shrineSnapshot = await _db.collection('Shrines').get();
-    List<Shrine> shrines = [];
+    final shrines = shrineSnapshot.docs
+        .map((doc) => Shrine.fromFirestore(doc.data(), doc.id))
+        .toList();
 
-    for (var doc in shrineSnapshot.docs) {
-      Shrine shrine = Shrine.fromFirestore(doc.data(), doc.id);
+    // ★変更：神社ごとに1件ずつDeitiesを取りに行くと件数分の通信が発生して遅いため、
+    // collectionGroupで全Deitiesを1回のクエリでまとめて取得し、親の神社IDでグルーピングする
+    final deitiesSnapshot = await _db.collectionGroup('Deities').get();
 
-      // ★サブコレクションの名前も 'Kamis' などにする場合はここを変更します
-      // （ここではFirestore上のコレクション名は 'Deities' のままと仮定しています）
-      final kamiSnapshot = await _db
-          .collection('Shrines')
-          .doc(shrine.id)
-          .collection('Deities') 
-          .get();
-
-      // ★変更：Deity から Kami に変更
-      List<Kami> kamiList = kamiSnapshot.docs.map((kamiDoc) {
-        return Kami.fromFirestore(kamiDoc.data(), kamiDoc.id);
-      }).toList();
-
-      shrine.kamis = kamiList; // ★変更：kamis にセット
-      shrines.add(shrine);
+    final kamiByShrineId = <String, List<Kami>>{};
+    for (final kamiDoc in deitiesSnapshot.docs) {
+      final shrineId = kamiDoc.reference.parent.parent!.id;
+      kamiByShrineId
+          .putIfAbsent(shrineId, () => [])
+          .add(Kami.fromFirestore(kamiDoc.data(), kamiDoc.id));
     }
+
+    for (final shrine in shrines) {
+      shrine.kami = kamiByShrineId[shrine.id] ?? [];
+    }
+
     return shrines;
   }
 
@@ -166,5 +166,14 @@ class FirestoreService {
       });
     }
     print("質問データの保存・更新が完了しました！");
+  }
+
+  // ==========================================
+  // ⑩ 診断結果のtypeIdに対応するTypeプロフィールを取得する関数
+  // ==========================================
+  Future<TypeInfo?> getType(int typeId) async {
+    final doc = await _db.collection('Type').doc(typeId.toString()).get();
+    if (!doc.exists) return null;
+    return TypeInfo.fromFirestore(doc.data()!);
   }
 }

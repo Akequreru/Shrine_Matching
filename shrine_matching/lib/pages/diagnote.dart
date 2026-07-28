@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shrine_matching/survices/firestore_service.dart';
+import 'package:shrine_matching/pages/userType.dart';
 
 // ==========================================
 // 1. データ定義
@@ -26,37 +28,45 @@ class DiagnosticScreen extends StatefulWidget {
 
 class _DiagnosticScreenState extends State<DiagnosticScreen> {
   final PageController _pageController = PageController();
-  
+  final FirestoreService _firestoreService = FirestoreService();
+
   // 現在の質問インデックス
   int _currentIndex = 0;
 
-  // 12問分の回答を保持するリスト（1: 選択肢A, -1: 選択肢B, 0: 未回答）
-  // 戻って選び直したときに上書きできるように、スコアの足し算ではなく「回答の記録」に変更
-  List<int> userAnswers = List.filled(12, 0);
+  bool _isLoading = true;
 
-  // いただいた12問のデータ（各軸3問ずつ）
-// いただいた12問のデータ（各軸3問ずつ）
-  final List<DiagnosticQuestion> questions = [
-    // --- 軸0: E or I (旅行スタイル・対人) ---
-    DiagnosticQuestion(axis: 0, text: "にぎやかな旅が好きですか？それとも、静かで落ち着いた旅が好きですか？", choiceA: "にぎやかな旅", choiceB: "静かで落ち着いた旅"),
-    DiagnosticQuestion(axis: 0, text: "大人数での旅行が好きですか？それとも、一人旅が好きですか？", choiceA: "大人数での旅行", choiceB: "一人旅"),
-    DiagnosticQuestion(axis: 0, text: "旅先で新しい友達を作りますか？それとも、人見知りしますか？", choiceA: "新しい友達", choiceB: "人見知り"),
-    
-    // --- 軸1: S or N (判断基準) ---
-    DiagnosticQuestion(axis: 1, text: "事実や具体的な情報に基づいて判断しますか？それとも、未来の可能性や直感に頼りますか？", choiceA: "事実や具体的な情報", choiceB: "未来の可能性や直感"),
-    DiagnosticQuestion(axis: 1, text: "現実的で実用的なことに焦点を当てますか？それとも、理想や抽象的なアイデアに興味を持ちますか？", choiceA: "現実的で実用的なこと", choiceB: "理想や抽象的なアイデア"),
-    DiagnosticQuestion(axis: 1, text: "今起こっていることに集中しますか？それとも、先のことを考えることが多いですか？", choiceA: "今起こっていること", choiceB: "先のこと"),
-    
-    // --- 軸2: T or F (意思決定) ---
-    DiagnosticQuestion(axis: 2, text: "論理的で客観的な判断を好みますか？それとも、人間関係や感情を考慮して判断しますか？", choiceA: "論理的で客観的", choiceB: "人間関係や感情"),
-    DiagnosticQuestion(axis: 2, text: "決定を下す際に、公平さや原則を重視しますか？それとも、調和や共感を重視しますか？", choiceA: "公平さや原則", choiceB: "調和や共感"),
-    DiagnosticQuestion(axis: 2, text: "自分の意見をはっきりと伝えることが得意ですか？それとも、他人の感情に配慮して言葉を選びますか？", choiceA: "意見をはっきりと伝える", choiceB: "他人の感情に配慮する"),
-    
-    // --- 軸3: J or P (旅行の計画性) ---
-    DiagnosticQuestion(axis: 3, text: "旅行は計画を立ててから出かけることが好きですか？それとも、気ままに出かけることを好みますか？", choiceA: "計画を立ててから出かける", choiceB: "気ままに出かける"),
-    DiagnosticQuestion(axis: 3, text: "旅行は予定通りに進めたいですか？それとも、思いがけない出来事がある方が良いですか？", choiceA: "予定通りに進めたい", choiceB: "思いがけない出来事がある方が良い"),
-    DiagnosticQuestion(axis: 3, text: "お土産はあらかじめ何を買うか決めますか？それとも、お土産屋さんで決めますか？", choiceA: "あらかじめ決めておく", choiceB: "お土産屋さんで決める"),
-  ];
+  // Firestoreの Questions コレクションから取得した質問（各軸3問ずつになる想定）
+  List<DiagnosticQuestion> questions = [];
+
+  // 各質問への回答を保持するリスト（1: 選択肢A, -1: 選択肢B, 0: 未回答）
+  // 戻って選び直したときに上書きできるように、スコアの足し算ではなく「回答の記録」に変更
+  List<int> userAnswers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQuestions();
+  }
+
+  Future<void> _loadQuestions() async {
+    final fetched = await _firestoreService.getQuestions();
+
+    // 同じ軸の質問がまとまるよう value（軸）でソート
+    fetched.sort((a, b) => a.value.compareTo(b.value));
+
+    setState(() {
+      questions = fetched
+          .map((q) => DiagnosticQuestion(
+                text: q.question,
+                choiceA: q.answer1,
+                choiceB: q.answer2,
+                axis: q.value,
+              ))
+          .toList();
+      userAnswers = List.filled(questions.length, 0);
+      _isLoading = false;
+    });
+  }
 
   @override
   void dispose() {
@@ -93,17 +103,18 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
 
   // 多数決の計算と結果画面への遷移
   void _calculateAndNavigate() {
-    // 3問ずつの合計値を計算（必ずプラスかマイナスになる）
-    int eScore = userAnswers[0] + userAnswers[1] + userAnswers[2];
-    int sScore = userAnswers[3] + userAnswers[4] + userAnswers[5];
-    int tScore = userAnswers[6] + userAnswers[7] + userAnswers[8];
-    int jScore = userAnswers[9] + userAnswers[10] + userAnswers[11];
+    // 軸(0:E/I, 1:S/N, 2:T/F, 3:J/P)ごとに回答を合計する
+    final Map<int, int> axisScores = {0: 0, 1: 0, 2: 0, 3: 0};
+    for (int i = 0; i < questions.length; i++) {
+      final axis = questions[i].axis;
+      axisScores[axis] = (axisScores[axis] ?? 0) + userAnswers[i];
+    }
 
     String typeStr = "";
-    typeStr += (eScore > 0) ? "E" : "I";
-    typeStr += (sScore > 0) ? "S" : "N";
-    typeStr += (tScore > 0) ? "T" : "F";
-    typeStr += (jScore > 0) ? "J" : "P";
+    typeStr += (axisScores[0]! > 0) ? "E" : "I";
+    typeStr += (axisScores[1]! > 0) ? "S" : "N";
+    typeStr += (axisScores[2]! > 0) ? "T" : "F";
+    typeStr += (axisScores[3]! > 0) ? "J" : "P";
 
     int typeId = _convertToTypeId(typeStr);
 
@@ -111,7 +122,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => ResultScreen(typeId: typeId, typeStr: typeStr),
+        builder: (context) => UserTypePage(typeId: typeId, typeStr: typeStr),
       ),
     );
   }
@@ -126,13 +137,23 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
     return typeMap[typeStr] ?? 1;
   }
 
+  // 「〜ですか？それとも、〜ですか？」の文を「？」の直後で改行する
+  String _formatQuestionText(String text) {
+    final parts = text.split('？').where((s) => s.isNotEmpty).toList();
+    return parts.map((s) => '$s？').join('\n');
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('相性診断'),
-        // AppBar左上の標準の戻るボタンをカスタマイズ（途中離脱を防ぐための確認などを入れることも可能）
-      ),
+      appBar: AppBar(),
       body: PageView.builder(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(), // スワイプ禁止
@@ -144,26 +165,33 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
         itemCount: questions.length,
         itemBuilder: (context, index) {
           final question = questions[index];
-          
+
           return Padding(
             padding: const EdgeInsets.all(24.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  "Q${index + 1} / ${questions.length}",
-                  style: const TextStyle(fontSize: 16, color: Colors.grey),
-                  textAlign: TextAlign.center,
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    "Q${index + 1}",
+                    style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                SizedBox(
+                  height: 3 * 28.0, // 2〜3行分を確保して質問ごとの高さのブレを無くす
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: Text(
+                      _formatQuestionText(question.text),
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, height: 1.4),
+                      textAlign: TextAlign.left,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 32),
-                
-                Text(
-                  question.text,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, height: 1.5),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 48),
 
                 // 選択肢A (+1)
                 _buildChoiceButton(
@@ -213,79 +241,6 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
         text,
         style: const TextStyle(fontSize: 16),
         textAlign: TextAlign.center,
-      ),
-    );
-  }
-}
-
-// ==========================================
-// 2. 結果画面（チームメンバーが後で作り込む用）
-// ==========================================
-class ResultScreen extends StatelessWidget {
-  final int typeId;
-  final String typeStr;
-
-  const ResultScreen({
-    Key? key,
-    required this.typeId,
-    required this.typeStr,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('診断結果'),
-        automaticallyImplyLeading: false, // 戻る矢印を隠す（診断をやり直させるため）
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                "あなたのタイプは...",
-                style: TextStyle(fontSize: 18, color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                "タイプ$typeId\n($typeStr)",
-                style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                "※ここに詳細な説明文やイラストを配置します。",
-                style: TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 48),
-              
-              // このボタンを押して、あなたに合う神社を表示する処理などを追加予定
-              ElevatedButton(
-                onPressed: () {
-                  // TODO: おすすめの神社一覧画面へ遷移する
-                },
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                ),
-                child: const Text("あなたに合う神社を見る"),
-              ),
-              const SizedBox(height: 16),
-              
-              TextButton(
-                onPressed: () {
-                  // 診断画面に戻ってやり直す
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const DiagnosticScreen()),
-                  );
-                },
-                child: const Text("もう一度診断する"),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

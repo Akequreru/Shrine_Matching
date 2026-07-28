@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shrine_matching/pages/userType.dart';
+import 'package:shrine_matching/pages/diagnote.dart';
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
@@ -60,7 +60,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                     ),
                     onPressed: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const UserTypePage()),
+                        MaterialPageRoute(builder: (_) => const DiagnosticScreen()),
                       );
                     },
                     child: const Padding(

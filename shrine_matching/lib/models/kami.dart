@@ -8,7 +8,7 @@ class Kami {
   Kami({
     required this.id,
     required this.name,
-    required this.mbti,
+    required this.type,
     required this.description,
     required this.matchTypes,
   });
@@ -17,9 +17,9 @@ class Kami {
     return Kami(
       id: documentId,
       name: data['name'] ?? '',
-      mbti: data['mbti'] ?? '',
+      type: data['mbti'] ?? 0,
       description: data['description'] ?? '',
-      matchTypes: List<String>.from(data['matchTypes'] ?? []),
+      matchTypes: List<int>.from(data['matchTypes'] ?? []),
     );
   }
 }

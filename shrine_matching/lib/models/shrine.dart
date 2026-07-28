@@ -13,7 +13,7 @@ class Shrine {
   final int favoriteCount;
   
   // ★追加：この神社に祀られている神様のリスト（初期値は空）
-  List<Kami> deities; 
+  List<Kami> kami; 
 
   Shrine({
     required this.id,
@@ -26,7 +26,7 @@ class Shrine {
     required this.longitude,
     required this.address,
     required this.favoriteCount,
-    this.deities = const [], // ★追加：最初は空っぽにしておく
+    this.kami = const [], // ★追加：最初は空っぽにしておく
   });
 
   factory Shrine.fromFirestore(Map<String, dynamic> data, String documentId) {
@@ -41,7 +41,7 @@ class Shrine {
       longitude: (data['longitude'] ?? 0.0).toDouble(),
       address: data['address'] ?? '',
       favoriteCount: data['favoriteCount'] ?? 0,
-      // deities はサブコレクションから別途取得して後から入れるため、ここでは処理しない
+      // kamis はサブコレクションから別途取得して後から入れるため、ここでは処理しない
     );
   }
 }
