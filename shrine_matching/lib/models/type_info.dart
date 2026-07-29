@@ -21,9 +21,9 @@ class TypeInfo {
     required this.favorite,
   });
 
-  factory TypeInfo.fromFirestore(Map<String, dynamic> data) {
+  factory TypeInfo.fromFirestore(Map<String, dynamic> data, String documentId) {
     return TypeInfo(
-      id: data['id'] ?? 0,
+      id: int.tryParse(documentId) ?? (data['id'] ?? 0),
       name: data['name'] ?? '',
       image: data['image'] ?? '',
       mbti: data['mbti'] ?? '',

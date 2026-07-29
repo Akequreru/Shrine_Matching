@@ -55,6 +55,35 @@ class FirestoreService {
   }
 
   // ==========================================
+  // ③-2 マッチング終了時にまとめてお気に入りへ追加する関数
+  // ==========================================
+  Future<void> addFavoriteShrines(String userId, List<String> shrineIds) async {
+    if (shrineIds.isEmpty) return;
+
+    final userRef = _db.collection('Users').doc(userId);
+    final userDoc = await userRef.get();
+    final existingFavorites = Set<String>.from(
+      userDoc.data()?['favoriteShrineIds'] ?? [],
+    );
+    final newShrineIds = shrineIds
+        .where((id) => !existingFavorites.contains(id))
+        .toSet();
+
+    if (newShrineIds.isEmpty) return;
+
+    final batch = _db.batch();
+    batch.update(userRef, {
+      'favoriteShrineIds': FieldValue.arrayUnion(newShrineIds.toList()),
+    });
+    for (final shrineId in newShrineIds) {
+      batch.update(_db.collection('Shrines').doc(shrineId), {
+        'favoriteCount': FieldValue.increment(1),
+      });
+    }
+    await batch.commit();
+  }
+
+  // ==========================================
   // ④ 特定のタイプで神社を絞り込む関数
   // ==========================================
   Future<List<Shrine>> getShrinesByType(String type) async {
@@ -174,6 +203,18 @@ class FirestoreService {
   Future<TypeInfo?> getType(int typeId) async {
     final doc = await _db.collection('Type').doc(typeId.toString()).get();
     if (!doc.exists) return null;
-    return TypeInfo.fromFirestore(doc.data()!);
+    return TypeInfo.fromFirestore(doc.data()!, doc.id);
+  }
+
+  // ==========================================
+  // ⑪ 16タイプすべてのTypeプロフィールを取得する関数
+  // ==========================================
+  Future<List<TypeInfo>> getAllTypes() async {
+    final snapshot = await _db.collection('Type').get();
+    final types = snapshot.docs
+        .map((doc) => TypeInfo.fromFirestore(doc.data(), doc.id))
+        .toList();
+    types.sort((a, b) => a.id.compareTo(b.id));
+    return types;
   }
 }

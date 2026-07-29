@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shrine_matching/survices/firestore_service.dart';
 
 class MatchingPage extends StatelessWidget {
@@ -50,6 +51,7 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
       _cards = matched
           .where((shrine) => shrine.images.isNotEmpty)
           .map((shrine) => _MatchingCardData(
+                id: shrine.id,
                 name: shrine.name,
                 description: shrine.concept,
                 images: shrine.images,
@@ -61,6 +63,7 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
   }
 
   final Map<String, int> _imageIndexByCard = <String, int>{};
+  final Set<String> _favoriteShrineIds = <String>{};
   int _swipeCycle = 0;
   Offset _dragOffset = Offset.zero;
   bool _isDragging = false;
@@ -73,6 +76,27 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
 
     _cards.removeAt(0);
     _swipeCycle++;
+  }
+
+  void _favoriteFrontCard() {
+    if (_cards.isEmpty) {
+      return;
+    }
+    _favoriteShrineIds.add(_cards.first.id);
+  }
+
+  Future<void> _saveFavoritesIfNeeded() async {
+    if (_favoriteShrineIds.isEmpty) {
+      return;
+    }
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      return;
+    }
+    await _firestoreService.addFavoriteShrines(
+      uid,
+      _favoriteShrineIds.toList(),
+    );
   }
 
   void _animateSwipeOut({required bool toRight, required double cardWidth}) {
@@ -97,6 +121,9 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
         _dragOffset = Offset.zero;
         _isAnimatingOut = false;
       });
+      if (_cards.isEmpty) {
+        _saveFavoritesIfNeeded();
+      }
     });
   }
 
@@ -288,10 +315,13 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
                       icon: const Icon(Icons.arrow_back),
                     ),
                     IconButton(
-                      onPressed: () => _animateSwipeOut(
-                        toRight: true,
-                        cardWidth: MediaQuery.sizeOf(context).width,
-                      ),
+                      onPressed: () {
+                        _favoriteFrontCard();
+                        _animateSwipeOut(
+                          toRight: true,
+                          cardWidth: MediaQuery.sizeOf(context).width,
+                        );
+                      },
                       icon: const Icon(Icons.stars_rounded),
                       color: Colors.amber,
                     ),
@@ -432,11 +462,13 @@ class _ImageNavButton extends StatelessWidget {
 
 class _MatchingCardData {
   const _MatchingCardData({
+    required this.id,
     required this.name,
     required this.description,
     required this.images,
   });
 
+  final String id;
   final String name;
   final String description;
   final List<String> images;
