@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "980995471354",
+    "project_id": "shrine-matching-f1a77",
+    "storage_bucket": "shrine-matching-f1a77.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:980995471354:android:74e8066754c96378af9643",
+        "android_client_info": {
+          "package_name": "com.example.shrine_matching"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCf9Ox7JXR6qjIf8-PUeexySRuq5-KZZ30"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
