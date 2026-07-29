@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shrine_matching/models/shrine.dart';
+import 'package:shrine_matching/pages/shrineInfo.dart';
 import 'package:shrine_matching/survices/auth_service.dart';
+import 'package:shrine_matching/survices/firestore_service.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -11,11 +14,46 @@ class ProfilePage extends StatelessWidget {
   }
 }
 
-class ProfilePageWidget extends StatelessWidget {
+class ProfilePageWidget extends StatefulWidget {
   const ProfilePageWidget({super.key});
 
   static String routeName = 'ProfilePage';
   static String routePath = '/profilePage';
+
+  @override
+  State<ProfilePageWidget> createState() => _ProfilePageWidgetState();
+}
+
+class _ProfilePageWidgetState extends State<ProfilePageWidget> {
+  final FirestoreService _firestoreService = FirestoreService();
+
+  bool _isLoadingFavorites = true;
+  List<Shrine> _favoriteShrines = <Shrine>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavoriteShrines();
+  }
+
+  Future<void> _loadFavoriteShrines() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      setState(() => _isLoadingFavorites = false);
+      return;
+    }
+
+    final user = await _firestoreService.getUserWithHistory(uid);
+    final shrines = user == null
+        ? <Shrine>[]
+        : await _firestoreService.getFavoriteShrines(user.favoriteShrineIds);
+
+    if (!mounted) return;
+    setState(() {
+      _favoriteShrines = shrines;
+      _isLoadingFavorites = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,11 +63,6 @@ class ProfilePageWidget extends StatelessWidget {
     const avatarSize = 100.0;
     final headerHeight = topInset + coverImageHeight;
     final avatarTop = headerHeight - (avatarSize / 1.7);
-
-    final typeIcons = List.generate(
-      5,
-      (index) => 'https://picsum.photos/seed/type$index/200',
-    );
 
     final visitedShrines = List.generate(
       4,
@@ -136,22 +169,60 @@ class ProfilePageWidget extends StatelessWidget {
           ),
           SizedBox(
             height: 88,
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-              scrollDirection: Axis.horizontal,
-              itemCount: typeIcons.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                return ClipOval(
-                  child: Image.network(
-                    typeIcons[index],
-                    width: 75,
-                    height: 75,
-                    fit: BoxFit.cover,
-                  ),
-                );
-              },
-            ),
+            child: _isLoadingFavorites
+                ? const Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : _favoriteShrines.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.fromLTRB(20, 10, 20, 0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'まだお気に入りの神社がありません',
+                            style: TextStyle(color: Colors.black54),
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _favoriteShrines.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(width: 10),
+                        itemBuilder: (context, index) {
+                          final shrine = _favoriteShrines[index];
+                          final imageUrl = shrine.images.isNotEmpty
+                              ? shrine.images.first
+                              : 'https://picsum.photos/seed/${shrine.id}/200';
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => ShrineInfoPage(
+                                    shrineName: shrine.name,
+                                    description: shrine.concept,
+                                    imageUrl: imageUrl,
+                                    details: shrine.description,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: ClipOval(
+                              child: Image.network(
+                                imageUrl,
+                                width: 75,
+                                height: 75,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
           ),
           const Padding(
             padding: EdgeInsets.fromLTRB(20, 16, 20, 0),

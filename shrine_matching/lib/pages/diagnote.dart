@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shrine_matching/survices/firestore_service.dart';
 import 'package:shrine_matching/pages/userType.dart';
 
@@ -117,6 +120,11 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
     typeStr += (axisScores[3]! > 0) ? "J" : "P";
 
     int typeId = _convertToTypeId(typeStr);
+
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      unawaited(_firestoreService.saveDiagnosticResult(uid, typeId));
+    }
 
     // Navigator.pushReplacement を使うと、結果画面から「戻る」ボタンで質問に戻れなくなります（診断リセット）
     Navigator.pushReplacement(
