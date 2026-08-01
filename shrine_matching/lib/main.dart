@@ -15,9 +15,15 @@ import 'package:shrine_matching/pages/map.dart';
 import 'package:shrine_matching/pages/bookmark.dart';
 import 'package:shrine_matching/pages/login.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:shrine_matching/survices/app_globals.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // TaskHandler（バックグラウンドサービス）とアプリ本体が通信するためのポートを用意する
+  FlutterForegroundTask.initCommunicationPort();
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -35,9 +41,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
+      navigatorKey: rootNavigatorKey,
       debugShowCheckedModeBanner: false,
-      home: AuthGate(),
+      home: const AuthGate(),
     );
   }
 }
@@ -65,14 +72,72 @@ class AuthGate extends StatelessWidget {
   }
 }
 
-class RootTabsPage extends StatelessWidget {
+class RootTabsPage extends StatefulWidget {
   const RootTabsPage({super.key});
+
+  @override
+  State<RootTabsPage> createState() => _RootTabsPageState();
+}
+
+class _RootTabsPageState extends State<RootTabsPage> with WidgetsBindingObserver {
+  final GlobalKey<HomePageWidgetState> _homeKey = GlobalKey<HomePageWidgetState>();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // バックグラウンドのすれ違い検知（ENTER）をリアルタイムで受け取り、
+    // タブに関係なくその場で参拝パネルを出せるようにする
+    FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
+    // アプリ起動直後にも一度チェックしておく
+    visitPromptService.checkNearbyShrineForVisit();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // アプリをバックグラウンドから復帰させたときにも参拝パネルをチェックする
+    if (state == AppLifecycleState.resumed) {
+      visitPromptService.checkNearbyShrineForVisit();
+    }
+  }
+
+  void _onReceiveTaskData(Object data) {
+    if (data is! Map) return;
+
+    if (data['type'] == 'nearbyShrineEnter') {
+      visitPromptService.showPromptForShrineData(
+        shrineId: data['shrineId'] as String? ?? '',
+        shrineName: data['shrineName'] as String? ?? '',
+        image: data['image'] as String? ?? '',
+        tags: List<String>.from(data['tags'] ?? []),
+        address: data['address'] as String? ?? '',
+      );
+    } else if (data['type'] == 'nearbyShrineExit') {
+      visitPromptService.clearPromptedShrine(data['shrineId'] as String? ?? '');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return CupertinoTabScaffold(
       tabBar: CupertinoTabBar(
         activeColor: Color(0xFFDB4713),
+        onTap: (index) {
+          // どのタブに切り替えても参拝パネルの対象になり得るのでチェックする
+          visitPromptService.checkNearbyShrineForVisit();
+          // Homeタブに来たときは、すれ違いパネルも再チェックする。
+          // 参拝パネルの処理待ち（優先表示）はrefreshCrossings側で行っている
+          if (index == 0) {
+            _homeKey.currentState?.refreshCrossings();
+          }
+        },
         items: [
           BottomNavigationBarItem(
             icon: Padding(
@@ -114,7 +179,7 @@ class RootTabsPage extends StatelessWidget {
       tabBuilder: (context, index) {
         switch (index) {
           case 0:
-            return CupertinoTabView(builder: (_) => const HomePageWidget());
+            return CupertinoTabView(builder: (_) => HomePageWidget(key: _homeKey));
           case 1:
             return CupertinoTabView(builder: (_) => const TypePage());
           case 2:
@@ -124,7 +189,7 @@ class RootTabsPage extends StatelessWidget {
           case 4:
             return CupertinoTabView(builder: (_) => const ProfilePage());
           default:
-            return CupertinoTabView(builder: (_) => const HomePageWidget());
+            return CupertinoTabView(builder: (_) => HomePageWidget(key: _homeKey));
         }
       },
     );
