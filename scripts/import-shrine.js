@@ -23,7 +23,7 @@ const PLACEHOLDER_IMAGES = [
 
 async function importShrinesAndKami() {
   const csvText = fs.readFileSync('./Book2.csv', 'utf8');
-  const rows = parse(csvText, { columns: false, skip_empty_lines: true });
+  const rows = parse(csvText, { columns: false, skip_empty_lines: true, bom: true });
   // 各行: [神社名, 緯度, 経度, 住所, 神様名, mbti, 説明, 相性1, 相性2]
 
   // 同じ神社名の行をグルーピング

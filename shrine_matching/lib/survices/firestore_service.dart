@@ -115,6 +115,15 @@ class FirestoreService {
         .toList();
   }
 
+  // ==========================================
+  // ⑤-2 ユーザーがお気に入りした神社のID一覧だけを取得する軽量版
+  // ==========================================
+  Future<List<String>> getFavoriteShrineIds(String userId) async {
+    final userDoc = await _db.collection('Users').doc(userId).get();
+    if (!userDoc.exists) return [];
+    return List<String>.from(userDoc.data()?['favoriteShrineIds'] ?? []);
+  }
+
  // ==========================================
   // ⑥ 神社一覧と、それぞれの神様（サブコレクション）をまとめて取得する関数
   // ==========================================
