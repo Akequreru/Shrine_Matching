@@ -1,16 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shrine_matching/survices/firestore_service.dart';
+import 'package:shrine_matching/models/shrine.dart';
 
 class MatchingPage extends StatelessWidget {
-  const MatchingPage({super.key});
+  const MatchingPage({super.key, this.typeId, this.shrineIds});
+
+  // 診断結果のタイプID（未診断で開かれた場合はnull＝全件表示）
+  final int? typeId;
+
+  // すれ違いパネルから開かれたときだけ指定される。指定時はこの神社たちを順番に表示する
+  final List<String>? shrineIds;
 
   @override
   Widget build(BuildContext context) {
-    return const MatchingPageWidget();
+    return MatchingPageWidget(typeId: typeId, shrineIds: shrineIds);
   }
 }
 
 class MatchingPageWidget extends StatefulWidget {
-  const MatchingPageWidget({super.key});
+  const MatchingPageWidget({super.key, this.typeId, this.shrineIds});
+
+  final int? typeId;
+  final List<String>? shrineIds;
 
   static String routeName = 'MatchingPage';
   static String routePath = '/matchingPage';
@@ -20,50 +32,94 @@ class MatchingPageWidget extends StatefulWidget {
 }
 
 class _MatchingPageWidgetState extends State<MatchingPageWidget> {
-  final List<_MatchingCardData> _cards = <_MatchingCardData>[
-    const _MatchingCardData(
-      name: 'Kitsune Shrine',
-      description: 'Energetic and curious. A match for adventurous days.',
-      images: [
-        'https://picsum.photos/seed/match1a/900/600',
-        'https://picsum.photos/seed/match1b/900/600',
-        'https://picsum.photos/seed/match1c/900/600',
-      ],
-    ),
-    const _MatchingCardData(
-      name: 'Forest Shrine',
-      description: 'Calm and grounded. Best for reflective moments.',
-      images: [
-        'https://picsum.photos/seed/match2a/900/600',
-        'https://picsum.photos/seed/match2b/900/600',
-        'https://picsum.photos/seed/match2c/900/600',
-      ],
-    ),
-    const _MatchingCardData(
-      name: 'Ocean Shrine',
-      description: 'Open and intuitive. A great fit for fresh starts.',
-      images: [
-        'https://picsum.photos/seed/match3a/900/600',
-        'https://picsum.photos/seed/match3b/900/600',
-        'https://picsum.photos/seed/match3c/900/600',
-      ],
-    ),
-  ];
+  final FirestoreService _firestoreService = FirestoreService();
+
+  bool _isLoading = true;
+  bool _hadAnyMatches = false;
+  List<_MatchingCardData> _cards = <_MatchingCardData>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMatches();
+  }
+
+  Future<void> _loadMatches() async {
+    final shrines = await _firestoreService.getShrinesWithKami();
+
+    List<_MatchingCardData> cards;
+    if (widget.shrineIds != null) {
+      // すれ違った神社を、渡された順番のまま並べる（タイプでの絞り込みは行わない）
+      final shrineById = {for (final s in shrines) s.id: s};
+      cards = widget.shrineIds!
+          .map((id) => shrineById[id])
+          .whereType<Shrine>()
+          .where((shrine) => shrine.images.isNotEmpty)
+          .map((shrine) => _MatchingCardData(
+                id: shrine.id,
+                name: shrine.name,
+                description: shrine.concept,
+                images: shrine.images,
+              ))
+          .toList();
+    } else {
+      final matched = shrines.where((shrine) {
+        if (widget.typeId == null) return true;
+        return shrine.kami.any((k) => k.matchTypes.contains(widget.typeId));
+      });
+      cards = matched
+          .where((shrine) => shrine.images.isNotEmpty)
+          .map((shrine) => _MatchingCardData(
+                id: shrine.id,
+                name: shrine.name,
+                description: shrine.concept,
+                images: shrine.images,
+              ))
+          .toList();
+    }
+
+    setState(() {
+      _cards = cards;
+      _hadAnyMatches = _cards.isNotEmpty;
+      _isLoading = false;
+    });
+  }
 
   final Map<String, int> _imageIndexByCard = <String, int>{};
+  final Set<String> _favoriteShrineIds = <String>{};
   int _swipeCycle = 0;
   Offset _dragOffset = Offset.zero;
   bool _isDragging = false;
   bool _isAnimatingOut = false;
 
-  void _moveFrontCardToBack() {
+  void _removeFrontCard() {
     if (_cards.isEmpty) {
       return;
     }
 
-    final _MatchingCardData moved = _cards.removeAt(0);
-    _cards.add(moved);
+    _cards.removeAt(0);
     _swipeCycle++;
+  }
+
+  void _favoriteFrontCard() {
+    if (_cards.isEmpty) {
+      return;
+    }
+    _favoriteShrineIds.add(_cards.first.id);
+  }
+
+  Future<void> _saveFavoritesIfNeeded() async {
+    if (_favoriteShrineIds.isEmpty) {
+      return;
+    }
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      return;
+    }
+    await _firestoreService.addFavoriteShrines(
+      uid,
+      _favoriteShrineIds.toList(),
+    );
   }
 
   void _animateSwipeOut({required bool toRight, required double cardWidth}) {
@@ -83,11 +139,23 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
         return;
       }
       setState(() {
-        _moveFrontCardToBack();
+        _removeFrontCard();
         _isDragging = false;
         _dragOffset = Offset.zero;
         _isAnimatingOut = false;
       });
+      if (_cards.isEmpty) {
+        _saveFavoritesIfNeeded();
+        _returnToHomeWhenFinished();
+      }
+    });
+  }
+
+  // 最後まで見終わったら、少し間を置いてHome画面（タブのルート）まで戻る
+  void _returnToHomeWhenFinished() {
+    Future<void>.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
     });
   }
 
@@ -127,6 +195,24 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF5F5F5),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_cards.isEmpty) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF5F5F5),
+        body: Center(
+          child: Text(
+            _hadAnyMatches ? 'すべての神社を見終わりました' : '相性の良い神社が見つかりませんでした',
+          ),
+        ),
+      );
+    }
+
     final _MatchingCardData frontCard = _cards.first;
     final _MatchingCardData? backCard = _cards.length > 1 ? _cards[1] : null;
 
@@ -261,10 +347,13 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
                       icon: const Icon(Icons.arrow_back),
                     ),
                     IconButton(
-                      onPressed: () => _animateSwipeOut(
-                        toRight: true,
-                        cardWidth: MediaQuery.sizeOf(context).width,
-                      ),
+                      onPressed: () {
+                        _favoriteFrontCard();
+                        _animateSwipeOut(
+                          toRight: true,
+                          cardWidth: MediaQuery.sizeOf(context).width,
+                        );
+                      },
                       icon: const Icon(Icons.stars_rounded),
                       color: Colors.amber,
                     ),
@@ -405,11 +494,13 @@ class _ImageNavButton extends StatelessWidget {
 
 class _MatchingCardData {
   const _MatchingCardData({
+    required this.id,
     required this.name,
     required this.description,
     required this.images,
   });
 
+  final String id;
   final String name;
   final String description;
   final List<String> images;

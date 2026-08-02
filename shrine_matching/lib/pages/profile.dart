@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shrine_matching/models/shrine.dart';
+import 'package:shrine_matching/pages/shrineInfo.dart';
+import 'package:shrine_matching/survices/auth_service.dart';
+import 'package:shrine_matching/survices/firestore_service.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -9,11 +14,46 @@ class ProfilePage extends StatelessWidget {
   }
 }
 
-class ProfilePageWidget extends StatelessWidget {
+class ProfilePageWidget extends StatefulWidget {
   const ProfilePageWidget({super.key});
 
   static String routeName = 'ProfilePage';
   static String routePath = '/profilePage';
+
+  @override
+  State<ProfilePageWidget> createState() => _ProfilePageWidgetState();
+}
+
+class _ProfilePageWidgetState extends State<ProfilePageWidget> {
+  final FirestoreService _firestoreService = FirestoreService();
+
+  bool _isLoadingFavorites = true;
+  List<Shrine> _favoriteShrines = <Shrine>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavoriteShrines();
+  }
+
+  Future<void> _loadFavoriteShrines() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      setState(() => _isLoadingFavorites = false);
+      return;
+    }
+
+    final user = await _firestoreService.getUserWithHistory(uid);
+    final shrines = user == null
+        ? <Shrine>[]
+        : await _firestoreService.getFavoriteShrines(user.favoriteShrineIds);
+
+    if (!mounted) return;
+    setState(() {
+      _favoriteShrines = shrines;
+      _isLoadingFavorites = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,11 +63,6 @@ class ProfilePageWidget extends StatelessWidget {
     const avatarSize = 100.0;
     final headerHeight = topInset + coverImageHeight;
     final avatarTop = headerHeight - (avatarSize / 1.7);
-
-    final typeIcons = List.generate(
-      5,
-      (index) => 'https://picsum.photos/seed/type$index/200',
-    );
 
     final visitedShrines = List.generate(
       4,
@@ -77,13 +112,35 @@ class ProfilePageWidget extends StatelessWidget {
               Positioned(
                 right: 8,
                 top: topInset + 8,
-                child: Material(
-                  color: const Color(0x818D8D8D),
-                  shape: const CircleBorder(),
-                  child: IconButton(
-                    onPressed: () => debugPrint('Settings pressed'),
-                    icon: const Icon(Icons.settings, color: Colors.white),
-                  ),
+                child: Row(
+                  children: [
+                    Material(
+                      color: const Color(0x818D8D8D),
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        onPressed: () => AuthService().signOut(),
+                        icon: const Icon(Icons.logout, color: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Material(
+                      color: const Color(0x818D8D8D),
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        onPressed: () => _showDeleteAccountDialog(context),
+                        icon: const Icon(Icons.delete_forever, color: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Material(
+                      color: const Color(0x818D8D8D),
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        onPressed: () => debugPrint('Settings pressed'),
+                        icon: const Icon(Icons.settings, color: Colors.white),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -112,22 +169,60 @@ class ProfilePageWidget extends StatelessWidget {
           ),
           SizedBox(
             height: 88,
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-              scrollDirection: Axis.horizontal,
-              itemCount: typeIcons.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                return ClipOval(
-                  child: Image.network(
-                    typeIcons[index],
-                    width: 75,
-                    height: 75,
-                    fit: BoxFit.cover,
-                  ),
-                );
-              },
-            ),
+            child: _isLoadingFavorites
+                ? const Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : _favoriteShrines.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.fromLTRB(20, 10, 20, 0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'まだお気に入りの神社がありません',
+                            style: TextStyle(color: Colors.black54),
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _favoriteShrines.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(width: 10),
+                        itemBuilder: (context, index) {
+                          final shrine = _favoriteShrines[index];
+                          final imageUrl = shrine.images.isNotEmpty
+                              ? shrine.images.first
+                              : 'https://picsum.photos/seed/${shrine.id}/200';
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => ShrineInfoPage(
+                                    shrineName: shrine.name,
+                                    description: shrine.concept,
+                                    imageUrl: imageUrl,
+                                    details: shrine.description,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: ClipOval(
+                              child: Image.network(
+                                imageUrl,
+                                width: 75,
+                                height: 75,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
           ),
           const Padding(
             padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -205,4 +300,150 @@ class ProfilePageWidget extends StatelessWidget {
       ),
     );
   }
+}
+
+void _showDeleteAccountDialog(BuildContext context) {
+  final authService = AuthService();
+
+  showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      bool isSubmitting = false;
+      String? errorMessage;
+
+      return StatefulBuilder(
+        builder: (dialogContext, setState) {
+          return AlertDialog(
+            title: const Text('アカウントを削除'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('この操作は取り消せません。本当に削除しますか？'),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 8),
+                  Text(errorMessage!, style: const TextStyle(color: Colors.red)),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.of(dialogContext).pop(),
+                child: const Text('キャンセル'),
+              ),
+              TextButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        setState(() {
+                          isSubmitting = true;
+                          errorMessage = null;
+                        });
+                        try {
+                          // まずはパスワード無しで削除を試みる
+                          await authService.deleteAccount();
+                          if (dialogContext.mounted) {
+                            Navigator.of(dialogContext).pop();
+                          }
+                        } on FirebaseAuthException catch (e) {
+                          if (e.code == 'requires-recent-login') {
+                            // 最近ログインしていない場合だけパスワード入力を求める
+                            if (dialogContext.mounted) {
+                              Navigator.of(dialogContext).pop();
+                            }
+                            if (context.mounted) {
+                              _showDeleteAccountPasswordDialog(context, authService);
+                            }
+                            return;
+                          }
+                          setState(() {
+                            isSubmitting = false;
+                            errorMessage = authService.messageForError(e);
+                          });
+                        } catch (e) {
+                          setState(() {
+                            isSubmitting = false;
+                            errorMessage = authService.messageForError(e);
+                          });
+                        }
+                      },
+                child: Text(
+                  '削除する',
+                  style: TextStyle(color: isSubmitting ? Colors.grey : Colors.red),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
+void _showDeleteAccountPasswordDialog(BuildContext context, AuthService authService) {
+  final passwordController = TextEditingController();
+
+  showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      bool isSubmitting = false;
+      String? errorMessage;
+
+      return StatefulBuilder(
+        builder: (dialogContext, setState) {
+          return AlertDialog(
+            title: const Text('アカウントを削除'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('セキュリティのため、確認のためパスワードを入力してください。'),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'パスワード'),
+                ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 8),
+                  Text(errorMessage!, style: const TextStyle(color: Colors.red)),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.of(dialogContext).pop(),
+                child: const Text('キャンセル'),
+              ),
+              TextButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        setState(() {
+                          isSubmitting = true;
+                          errorMessage = null;
+                        });
+                        try {
+                          await authService.deleteAccount(password: passwordController.text);
+                          if (dialogContext.mounted) {
+                            Navigator.of(dialogContext).pop();
+                          }
+                        } catch (e) {
+                          setState(() {
+                            isSubmitting = false;
+                            errorMessage = authService.messageForError(e);
+                          });
+                        }
+                      },
+                child: Text(
+                  '削除する',
+                  style: TextStyle(color: isSubmitting ? Colors.grey : Colors.red),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
 }
