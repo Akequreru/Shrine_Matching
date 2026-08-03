@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shrine_matching/models/shrine.dart';
+import 'package:shrine_matching/pages/diagnote.dart';
 import 'package:shrine_matching/pages/shrineInfo.dart';
-import 'package:shrine_matching/survices/auth_service.dart';
-import 'package:shrine_matching/survices/firestore_service.dart';
+import 'package:shrine_matching/services/auth_service.dart';
+import 'package:shrine_matching/services/firestore_service.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -75,7 +76,7 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget> {
     );
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFFEFEFE),
       body: ListView(
         primary: true,
         physics: const BouncingScrollPhysics(
@@ -128,7 +129,10 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget> {
                       shape: const CircleBorder(),
                       child: IconButton(
                         onPressed: () => _showDeleteAccountDialog(context),
-                        icon: const Icon(Icons.delete_forever, color: Colors.white),
+                        icon: const Icon(
+                          Icons.delete_forever,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -149,21 +153,21 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget> {
           const Padding(
             padding: EdgeInsets.fromLTRB(20, 0, 20, 0),
             child: Text(
-              'Name',
+              '名前',
               style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
             ),
           ),
           const Padding(
             padding: EdgeInsets.fromLTRB(20, 10, 20, 0),
             child: Text(
-              'Status',
+              'ステータス',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
             ),
           ),
           const Padding(
             padding: EdgeInsets.fromLTRB(20, 14, 20, 0),
             child: Text(
-              'My Shrine Types',
+              '私の神社タイプ',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
             ),
           ),
@@ -178,56 +182,54 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget> {
                     ),
                   )
                 : _favoriteShrines.isEmpty
-                    ? const Padding(
-                        padding: EdgeInsets.fromLTRB(20, 10, 20, 0),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'まだお気に入りの神社がありません',
-                            style: TextStyle(color: Colors.black54),
-                          ),
-                        ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _favoriteShrines.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(width: 10),
-                        itemBuilder: (context, index) {
-                          final shrine = _favoriteShrines[index];
-                          final imageUrl = shrine.images.isNotEmpty
-                              ? shrine.images.first
-                              : 'https://picsum.photos/seed/${shrine.id}/200';
-                          return GestureDetector(
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => ShrineInfoPage(
-                                    shrineName: shrine.name,
-                                    description: shrine.concept,
-                                    imageUrl: imageUrl,
-                                    details: shrine.description,
-                                  ),
-                                ),
-                              );
-                            },
-                            child: ClipOval(
-                              child: Image.network(
-                                imageUrl,
-                                width: 75,
-                                height: 75,
-                                fit: BoxFit.cover,
+                ? const Padding(
+                    padding: EdgeInsets.fromLTRB(20, 10, 20, 0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'まだお気に入りの神社がありません',
+                        style: TextStyle(color: Colors.black54),
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _favoriteShrines.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(width: 10),
+                    itemBuilder: (context, index) {
+                      final shrine = _favoriteShrines[index];
+                      final imageUrl = shrine.images.isNotEmpty
+                          ? shrine.images.first
+                          : 'https://picsum.photos/seed/${shrine.id}/200';
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ShrineInfoPage(
+                                shrineId: shrine.id,
+                                initialShrine: shrine,
                               ),
                             ),
                           );
                         },
-                      ),
+                        child: ClipOval(
+                          child: Image.network(
+                            imageUrl,
+                            width: 75,
+                            height: 75,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
           ),
           const Padding(
             padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: Text(
-              'Visited Shrines',
+              '訪れた神社',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
             ),
           ),
@@ -254,7 +256,7 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget> {
           const Padding(
             padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: Text(
-              'Shrines Crossed Paths',
+              'すれ違った神社',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
             ),
           ),
@@ -288,10 +290,14 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget> {
                   borderRadius: BorderRadius.circular(50),
                 ),
               ),
-              onPressed: () => debugPrint('Retake test pressed'),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const DiagnosticScreen()),
+                );
+              },
               child: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                child: Text('Retake the Test'),
+                child: Text('もう一度診断する'),
               ),
             ),
           ),
@@ -322,13 +328,18 @@ void _showDeleteAccountDialog(BuildContext context) {
                 const Text('この操作は取り消せません。本当に削除しますか？'),
                 if (errorMessage != null) ...[
                   const SizedBox(height: 8),
-                  Text(errorMessage!, style: const TextStyle(color: Colors.red)),
+                  Text(
+                    errorMessage!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
                 ],
               ],
             ),
             actions: [
               TextButton(
-                onPressed: isSubmitting ? null : () => Navigator.of(dialogContext).pop(),
+                onPressed: isSubmitting
+                    ? null
+                    : () => Navigator.of(dialogContext).pop(),
                 child: const Text('キャンセル'),
               ),
               TextButton(
@@ -352,7 +363,10 @@ void _showDeleteAccountDialog(BuildContext context) {
                               Navigator.of(dialogContext).pop();
                             }
                             if (context.mounted) {
-                              _showDeleteAccountPasswordDialog(context, authService);
+                              _showDeleteAccountPasswordDialog(
+                                context,
+                                authService,
+                              );
                             }
                             return;
                           }
@@ -369,7 +383,9 @@ void _showDeleteAccountDialog(BuildContext context) {
                       },
                 child: Text(
                   '削除する',
-                  style: TextStyle(color: isSubmitting ? Colors.grey : Colors.red),
+                  style: TextStyle(
+                    color: isSubmitting ? Colors.grey : Colors.red,
+                  ),
                 ),
               ),
             ],
@@ -380,7 +396,10 @@ void _showDeleteAccountDialog(BuildContext context) {
   );
 }
 
-void _showDeleteAccountPasswordDialog(BuildContext context, AuthService authService) {
+void _showDeleteAccountPasswordDialog(
+  BuildContext context,
+  AuthService authService,
+) {
   final passwordController = TextEditingController();
 
   showDialog<void>(
@@ -406,13 +425,18 @@ void _showDeleteAccountPasswordDialog(BuildContext context, AuthService authServ
                 ),
                 if (errorMessage != null) ...[
                   const SizedBox(height: 8),
-                  Text(errorMessage!, style: const TextStyle(color: Colors.red)),
+                  Text(
+                    errorMessage!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
                 ],
               ],
             ),
             actions: [
               TextButton(
-                onPressed: isSubmitting ? null : () => Navigator.of(dialogContext).pop(),
+                onPressed: isSubmitting
+                    ? null
+                    : () => Navigator.of(dialogContext).pop(),
                 child: const Text('キャンセル'),
               ),
               TextButton(
@@ -424,7 +448,9 @@ void _showDeleteAccountPasswordDialog(BuildContext context, AuthService authServ
                           errorMessage = null;
                         });
                         try {
-                          await authService.deleteAccount(password: passwordController.text);
+                          await authService.deleteAccount(
+                            password: passwordController.text,
+                          );
                           if (dialogContext.mounted) {
                             Navigator.of(dialogContext).pop();
                           }
@@ -437,7 +463,9 @@ void _showDeleteAccountPasswordDialog(BuildContext context, AuthService authServ
                       },
                 child: Text(
                   '削除する',
-                  style: TextStyle(color: isSubmitting ? Colors.grey : Colors.red),
+                  style: TextStyle(
+                    color: isSubmitting ? Colors.grey : Colors.red,
+                  ),
                 ),
               ),
             ],

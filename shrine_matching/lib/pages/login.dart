@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shrine_matching/survices/auth_service.dart';
+import 'package:shrine_matching/services/auth_service.dart';
 import 'package:shrine_matching/pages/signup.dart';
 
 class LoginPage extends StatefulWidget {
@@ -68,18 +68,42 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 32),
                 TextField(
                   controller: _usernameController,
+                  cursorColor: Colors.black,
                   decoration: const InputDecoration(
                     labelText: 'ユーザー名',
-                    border: OutlineInputBorder(),
+                    labelStyle: TextStyle(color: Colors.black),
+                    floatingLabelStyle: TextStyle(color: Colors.black),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(50)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(50)),
+                      borderSide: BorderSide(color: Colors.black),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(50)),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _passwordController,
                   obscureText: true,
+                  cursorColor: Colors.black,
                   decoration: const InputDecoration(
                     labelText: 'パスワード',
-                    border: OutlineInputBorder(),
+                    labelStyle: TextStyle(color: Colors.black),
+                    floatingLabelStyle: TextStyle(color: Colors.black),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(50)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(50)),
+                      borderSide: BorderSide(color: Colors.black),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(50)),
+                    ),
                   ),
                 ),
                 if (_errorMessage != null) ...[
@@ -114,11 +138,14 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 12),
                 TextButton(
+                  style: TextButton.styleFrom(foregroundColor: Colors.black),
                   onPressed: _isSubmitting
                       ? null
                       : () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const SignUpPage()),
+                            MaterialPageRoute(
+                              builder: (_) => const SignUpPage(),
+                            ),
                           );
                         },
                   child: const Text('アカウントを作成する'),

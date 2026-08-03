@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shrine_matching/survices/auth_service.dart';
+import 'package:shrine_matching/pages/diagnote.dart';
+import 'package:shrine_matching/services/auth_service.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -43,10 +44,13 @@ class _SignUpPageState extends State<SignUpPage> {
         username: _usernameController.text,
         password: _passwordController.text,
       );
-      // AuthGateはログイン画面の下にいるので、pushしてきたこの画面を閉じて
-      // 一番下まで戻さないと、切り替わったHome画面が表に出てこない
+      // 新規登録後はそのまま診断フローへ進める。
+      // 最下層(AuthGate)は残し、途中の画面は片付けて診断画面を先頭にする。
       if (mounted) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const DiagnosticScreen()),
+          (route) => route.isFirst,
+        );
       }
     } catch (e) {
       setState(() {
@@ -64,7 +68,14 @@ class _SignUpPageState extends State<SignUpPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(),
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
