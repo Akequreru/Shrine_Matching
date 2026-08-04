@@ -291,4 +291,18 @@ class FirestoreService {
         .doc(shrine.id)
         .set({'markedAt': FieldValue.serverTimestamp()});
   }
+
+  // ==========================================
+  // ⑮ プロフィールのアイコン画像URLを更新する関数
+  // ==========================================
+  Future<void> updateAvatarUrl(String userId, String url) async {
+    await _db.collection('Users').doc(userId).update({'avatarUrl': url});
+  }
+
+  // ==========================================
+  // ⑯ プロフィールの背景画像URLを更新する関数
+  // ==========================================
+  Future<void> updateCoverUrl(String userId, String url) async {
+    await _db.collection('Users').doc(userId).update({'coverUrl': url});
+  }
 }
