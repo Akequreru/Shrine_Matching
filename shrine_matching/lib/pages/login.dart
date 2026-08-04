@@ -60,6 +60,8 @@ class _LoginPageState extends State<LoginPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Image.asset('assets/logo.png', width: 120, height: 120),
+                const SizedBox(height: 16),
                 const Text(
                   'ログイン',
                   textAlign: TextAlign.center,

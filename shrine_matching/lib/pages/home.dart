@@ -34,14 +34,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                     style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      'https://picsum.photos/seed/306/600',
-                      width: 300,
-                      height: 300,
-                      fit: BoxFit.cover,
-                    ),
+                  Image.asset(
+                    'assets/logo.png',
+                    width: 200,
+                    height: 200,
                   ),
                   const SizedBox(height: 16),
                   const Text(
