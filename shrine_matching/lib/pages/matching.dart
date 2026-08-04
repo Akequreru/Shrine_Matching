@@ -36,6 +36,8 @@ class MatchingPageWidget extends StatefulWidget {
   State<MatchingPageWidget> createState() => _MatchingPageWidgetState();
 }
 
+enum _CardSwipeIntent { none, yes, no }
+
 class _MatchingPageWidgetState extends State<MatchingPageWidget> {
   static const List<String> _placeholderImages = <String>[
     'https://picsum.photos/seed/199/900/700',
@@ -378,6 +380,16 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
                     final double dragProgress =
                         (_dragOffset.dx.abs() / cardWidth).clamp(0.0, 1.0);
                     final double rotation = (_dragOffset.dx / cardWidth) * 0.22;
+                    final _CardSwipeIntent swipeIntent = _dragOffset.dx > 0
+                        ? _CardSwipeIntent.yes
+                        : _dragOffset.dx < 0
+                        ? _CardSwipeIntent.no
+                        : _CardSwipeIntent.none;
+                    final double overlayProgress =
+                        (_dragOffset.dx.abs() / (cardWidth * 0.26)).clamp(
+                          0.0,
+                          1.0,
+                        );
 
                     return Stack(
                       alignment: Alignment.center,
@@ -396,6 +408,8 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
                                     card: backCard,
                                     onOpenBasicInfo: () =>
                                         _openShrineInfo(backCard),
+                                    swipeIntent: _CardSwipeIntent.none,
+                                    overlayProgress: 0,
                                   ),
                                 ),
                               ),
@@ -448,6 +462,8 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
                                 card: frontCard,
                                 onOpenBasicInfo: () =>
                                     _openShrineInfo(frontCard),
+                                swipeIntent: swipeIntent,
+                                overlayProgress: overlayProgress,
                               ),
                             ),
                           ),
@@ -470,171 +486,215 @@ class _MatchingCard extends StatelessWidget {
     super.key,
     required this.card,
     required this.onOpenBasicInfo,
+    this.swipeIntent = _CardSwipeIntent.none,
+    this.overlayProgress = 0,
   });
+
+  static const String _yesRibbonAssetPath = 'lib/assets/loading_ribbon.png';
 
   final _MatchingCardData card;
   final VoidCallback onOpenBasicInfo;
+  final _CardSwipeIntent swipeIntent;
+  final double overlayProgress;
 
   @override
   Widget build(BuildContext context) {
     final visibleTags = card.tags.take(6).toList();
+    final double clampedOverlayProgress = overlayProgress.clamp(0.0, 1.0);
 
     return Card(
       elevation: 0.5,
+      clipBehavior: Clip.antiAlias,
       color: const Color(0xFFFEFEFE),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: const BorderSide(color: Color(0xFFE6E3DE)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              card.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.zenOldMincho(
-                fontSize: 34,
-                fontWeight: FontWeight.w600,
-                color: card.accentColor,
-                height: 1.06,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '祭神 ${card.saijin}',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.zenOldMincho(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: card.accentColor,
-                height: 1.2,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  card.images.first,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: const Color(0xFFE9E9E9),
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.broken_image_outlined,
-                        color: Colors.black45,
-                        size: 38,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  card.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.zenOldMincho(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w600,
+                    color: card.accentColor,
+                    height: 1.06,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '祭神 ${card.saijin}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.zenOldMincho(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: card.accentColor,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Expanded(
-                  child: Text(
-                    card.address,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.zenKakuGothicNew(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w400,
-                      color: Colors.black54,
-                      height: 1.2,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      card.images.first,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: const Color(0xFFE9E9E9),
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.broken_image_outlined,
+                            color: Colors.black45,
+                            size: 38,
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.location_on_rounded,
-                  color: Color(0xFF7A767B),
-                  size: 30,
+                const SizedBox(height: 10),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        card.address,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.zenKakuGothicNew(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w400,
+                          color: Colors.black54,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.location_on_rounded,
+                      color: Color(0xFF7A767B),
+                      size: 30,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  card.concept,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.zenOldMincho(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.black87,
+                    height: 1.65,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: visibleTags.map((tag) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: card.accentColor.withValues(alpha: 0.45),
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        tag,
+                        style: GoogleFonts.zenKakuGothicNew(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                          color: card.accentColor,
+                          height: 1.2,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.center,
+                  child: OutlinedButton(
+                    onPressed: onOpenBasicInfo,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF7A767B),
+                      side: BorderSide(
+                        color: card.accentColor.withValues(alpha: 0.4),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      textStyle: GoogleFonts.zenKakuGothicNew(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Text('基本情報を見る'),
+                        SizedBox(width: 2),
+                        Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              card.concept,
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.zenOldMincho(
-                fontSize: 16,
-                fontWeight: FontWeight.w400,
-                color: Colors.black87,
-                height: 1.65,
+          ),
+          if (swipeIntent != _CardSwipeIntent.none)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: swipeIntent == _CardSwipeIntent.yes
+                    ? Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Container(
+                            color: Colors.white.withValues(
+                              alpha: 0.14 + (0.24 * clampedOverlayProgress),
+                            ),
+                          ),
+                          Align(
+                            alignment: Alignment.center,
+                            child: Opacity(
+                              opacity: 0.3 + (0.7 * clampedOverlayProgress),
+                              child: Image.asset(
+                                _yesRibbonAssetPath,
+                                fit: BoxFit.fitWidth,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Container(
+                        color: const Color(0xFF5E5E5E).withValues(
+                          alpha: 0.18 + (0.52 * clampedOverlayProgress),
+                        ),
+                      ),
               ),
             ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: visibleTags.map((tag) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: card.accentColor.withValues(alpha: 0.45),
-                    ),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    tag,
-                    style: GoogleFonts.zenKakuGothicNew(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                      color: card.accentColor,
-                      height: 1.2,
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.center,
-              child: OutlinedButton(
-                onPressed: onOpenBasicInfo,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF7A767B),
-                  side: BorderSide(
-                    color: card.accentColor.withValues(alpha: 0.4),
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  textStyle: GoogleFonts.zenKakuGothicNew(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Text('基本情報を見る'),
-                    SizedBox(width: 2),
-                    Icon(Icons.keyboard_arrow_down_rounded, size: 18),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
