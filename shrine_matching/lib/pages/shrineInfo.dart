@@ -141,13 +141,13 @@ class _ShrineInfoWidgetState extends State<ShrineInfoWidget> {
       return _yellowTypeColor;
     }
     if (<int>{10, 14, 2, 6}.contains(typeId)) {
-      return _greenTypeColor;
+      return _purpleTypeColor;
     }
     if (<int>{12, 16, 4, 8}.contains(typeId)) {
       return _blueTypeColor;
     }
     if (<int>{9, 11, 1, 3}.contains(typeId)) {
-      return _purpleTypeColor;
+      return _greenTypeColor;
     }
     return _greenTypeColor;
   }

@@ -183,7 +183,7 @@ class _VisitPromptDialogState extends State<VisitPromptDialog> {
                   style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                const Text('近くにいるようです。参拝しましたか？', textAlign: TextAlign.center),
+                const Text('近くの神社があなたに呼び掛けています。', textAlign: TextAlign.center),
                 const SizedBox(height: 20),
                 if (_isDone)
                   const Text('参拝を記録しました', style: TextStyle(color: Colors.green))
@@ -208,6 +208,11 @@ class _VisitPromptDialogState extends State<VisitPromptDialog> {
                                 _isSubmitting = false;
                                 _isDone = true;
                               });
+
+                              // 「参拝を記録しました」を少し見せてから自動で閉じる
+                              await Future.delayed(const Duration(seconds: 2));
+                              if (!mounted) return;
+                              Navigator.of(context).pop();
                             },
                       child: _isSubmitting
                           ? const SizedBox(
