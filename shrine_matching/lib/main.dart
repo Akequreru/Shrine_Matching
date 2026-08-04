@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:device_preview/device_preview.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_floating_bottom_bar/flutter_floating_bottom_bar.dart';
 import 'package:shrine_matching/pages/home.dart';
@@ -26,6 +26,14 @@ void main() async {
 
   if (!kIsWeb) {
     FlutterForegroundTask.initCommunicationPort();
+
+    // 独自のフローティングタブバーを使っているので、Android標準のナビゲーションバー
+    // （ホームボタン等）は隠す。ステータスバー（時計・電池など）は残す。
+    // 画面端からスワイプすれば一時的に再表示される。
+    await SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: [SystemUiOverlay.top],
+    );
   }
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -35,7 +43,7 @@ void main() async {
   // 実際に質問を読み込む診断画面に着く頃には通信が速くなっている想定。
   unawaited(FirebaseFirestore.instance.collection('Questions').limit(1).get());
 
-  runApp(DevicePreview(enabled: true, builder: (context) => const MyApp()));
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {

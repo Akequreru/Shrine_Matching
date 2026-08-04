@@ -72,7 +72,7 @@ class _MapPageState extends State<MapPage> {
       builder: (sheetContext) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -303,9 +303,29 @@ class _MapPageState extends State<MapPage> {
       ),
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 50),
-        child: FloatingActionButton(
-          onPressed: _determinePosition,
-          child: const Icon(Icons.my_location),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FloatingActionButton(
+              heroTag: 'crossingToggle',
+              backgroundColor: _isCrossingServiceRunning
+                  ? const Color(0xFFDB4713)
+                  : null,
+              onPressed: _toggleCrossingService,
+              tooltip: _isCrossingServiceRunning ? 'すれ違い検知を停止' : 'すれ違い検知を開始',
+              child: Icon(
+                _isCrossingServiceRunning
+                    ? Icons.notifications_active
+                    : Icons.notifications_off_outlined,
+              ),
+            ),
+            const SizedBox(height: 12),
+            FloatingActionButton(
+              heroTag: 'myLocation',
+              onPressed: _determinePosition,
+              child: const Icon(Icons.my_location),
+            ),
+          ],
         ),
       ),
     );

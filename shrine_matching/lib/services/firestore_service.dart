@@ -179,6 +179,17 @@ class FirestoreService {
   }
 
   // ==========================================
+  // ⑥-2 Home画面の「同じ○○タイプの神社」欄用に、祭神のタイプが指定タイプと
+  // 一致する神社を取得する関数（相性(matchTypes)ではなく、タイプそのものの一致で絞り込む）
+  // ==========================================
+  Future<List<Shrine>> getShrinesWithSameKamiType(int typeId) async {
+    final shrines = await getShrinesWithKami();
+    return shrines
+        .where((shrine) => shrine.kami.any((kami) => kami.type == typeId))
+        .toList();
+  }
+
+  // ==========================================
   // ⑦ 診断結果を履歴に保存しつつ、最新タイプも更新する関数
   // ==========================================
   Future<void> saveDiagnosticResult(String userId, int resultType) async {
@@ -266,6 +277,27 @@ class FirestoreService {
         .collection('Crossings')
         .where('seen', isEqualTo: false)
         .orderBy('crossedAt', descending: true)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => Crossing.fromFirestore(doc.data(), doc.id))
+        .toList();
+  }
+
+  // ==========================================
+  // ⑫-2 Home画面の「最近すれ違った神社」欄用に、直近の「すれ違い」記録を取得する関数
+  // （既読/未読を問わず、新しい順にlimit件だけ）
+  // ==========================================
+  Future<List<Crossing>> getRecentCrossings({int limit = 5}) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return [];
+
+    final snapshot = await _db
+        .collection('Users')
+        .doc(uid)
+        .collection('Crossings')
+        .orderBy('crossedAt', descending: true)
+        .limit(limit)
         .get();
 
     return snapshot.docs

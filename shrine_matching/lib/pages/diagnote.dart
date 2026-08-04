@@ -217,11 +217,13 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                 const SizedBox(height: 16),
 
                 SizedBox(
-                  height: 3 * 28.0, // 2〜3行分を確保して質問ごとの高さのブレを無くす
+                  height: 4 * 28.0, // 4行分を確保して長い質問文でも欠けないようにする
                   child: Align(
                     alignment: Alignment.topLeft,
                     child: Text(
                       _formatQuestionText(question.text),
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.zenOldMincho(
                         fontSize: 20,
                         fontWeight: FontWeight.w500,

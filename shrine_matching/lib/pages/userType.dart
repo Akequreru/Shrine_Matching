@@ -42,7 +42,7 @@ class _UserTypePageState extends State<UserTypePage> {
       case '仙人':
       case '将軍':
       case '発明家':
-        return green;
+        return purple;
       case '伝道師':
       case '祈祷者':
       case '師範':
@@ -52,7 +52,7 @@ class _UserTypePageState extends State<UserTypePage> {
       case '庇護者':
       case '船頭':
       case '宿主':
-        return purple;
+        return green;
       default:
         return const Color(0xFFDB4713);
     }
