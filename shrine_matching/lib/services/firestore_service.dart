@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/shrine.dart';
 import '../models/question.dart';
 import '../models/app_user.dart';
-import '../models/kami.dart';     // ★変更：kami.dart
-import '../models/history.dart';  // ★変更：history.dart
+import '../models/kami.dart'; // ★変更：kami.dart
+import '../models/history.dart'; // ★変更：history.dart
 import '../models/type_info.dart';
+import '../models/crossing.dart';
 
 class FirestoreService {
   // Firestoreのインスタンス（通信窓口）を変数にしておく
@@ -103,17 +105,52 @@ class FirestoreService {
   Future<List<Shrine>> getFavoriteShrines(List<String> favoriteIds) async {
     if (favoriteIds.isEmpty) return [];
 
-    final snapshot = await _db
-        .collection('Shrines')
-        .where(FieldPath.documentId, whereIn: favoriteIds)
-        .get();
+    // Firestore whereIn has a max item limit, so split into small chunks.
+    const int whereInLimit = 10;
+    final ids = favoriteIds.where((id) => id.trim().isNotEmpty).toList();
+    final shrineById = <String, Shrine>{};
 
-    return snapshot.docs
-        .map((doc) => Shrine.fromFirestore(doc.data(), doc.id))
-        .toList();
+    for (int i = 0; i < ids.length; i += whereInLimit) {
+      final end = (i + whereInLimit) > ids.length
+          ? ids.length
+          : i + whereInLimit;
+      final chunk = ids.sublist(i, end);
+
+      final snapshot = await _db
+          .collection('Shrines')
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+
+      for (final doc in snapshot.docs) {
+        shrineById[doc.id] = Shrine.fromFirestore(doc.data(), doc.id);
+      }
+    }
+
+    // Keep the same order as favorite IDs and skip deleted shrine docs.
+    return ids.map((id) => shrineById[id]).whereType<Shrine>().toList();
   }
 
- // ==========================================
+  // ==========================================
+  // ⑤-2 ユーザーがお気に入りした神社のID一覧だけを取得する軽量版
+  // ==========================================
+  Future<List<String>> getFavoriteShrineIds(String userId) async {
+    final userDoc = await _db.collection('Users').doc(userId).get();
+    if (!userDoc.exists) return [];
+    return List<String>.from(userDoc.data()?['favoriteShrineIds'] ?? []);
+  }
+
+  // ==========================================
+  // ⑤-3 現在ログイン中ユーザーの「縁を結んだ神社」を取得する関数
+  // ==========================================
+  Future<List<Shrine>> getMatchedShrinesForCurrentUser() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return [];
+
+    final favoriteIds = await getFavoriteShrineIds(uid);
+    return getFavoriteShrines(favoriteIds);
+  }
+
+  // ==========================================
   // ⑥ 神社一覧と、それぞれの神様（サブコレクション）をまとめて取得する関数
   // ==========================================
   Future<List<Shrine>> getShrinesWithKami() async {
@@ -152,9 +189,7 @@ class FirestoreService {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    await userRef.update({
-      'lastType': resultType,
-    });
+    await userRef.update({'lastType': resultType});
   }
 
   // ==========================================
@@ -216,5 +251,120 @@ class FirestoreService {
         .toList();
     types.sort((a, b) => a.id.compareTo(b.id));
     return types;
+  }
+
+  // ==========================================
+  // ⑫ 前回確認していない「すれ違い」記録を取得する関数
+  // ==========================================
+  Future<List<Crossing>> getUnseenCrossings() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return [];
+
+    final snapshot = await _db
+        .collection('Users')
+        .doc(uid)
+        .collection('Crossings')
+        .where('seen', isEqualTo: false)
+        .orderBy('crossedAt', descending: true)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => Crossing.fromFirestore(doc.data(), doc.id))
+        .toList();
+  }
+
+  // ==========================================
+  // ⑬ 「すれ違い」記録を確認済みにする関数
+  // ==========================================
+  Future<void> markCrossingsAsSeen(List<String> crossingIds) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || crossingIds.isEmpty) return;
+
+    final batch = _db.batch();
+    for (final id in crossingIds) {
+      batch.update(
+        _db.collection('Users').doc(uid).collection('Crossings').doc(id),
+        {'seen': true},
+      );
+    }
+    await batch.commit();
+  }
+
+  // ==========================================
+  // ⑭ 参拝を記録する関数
+  // ==========================================
+  Future<void> recordVisit(Shrine shrine) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    await _db.collection('Users').doc(uid).collection('Visits').add({
+      'shrineId': shrine.id,
+      'shrineName': shrine.name,
+      'image': shrine.images.isNotEmpty ? shrine.images.first : '',
+      'tags': shrine.tags,
+      'address': shrine.address,
+      'visitedAt': FieldValue.serverTimestamp(),
+    });
+
+    // 参拝した神社は、次にそこから離れたときに「すれ違い」として二重に
+    // 記録されないよう、印を残しておく（バックグラウンド側のEXIT検知で消費する）
+    await _db
+        .collection('Users')
+        .doc(uid)
+        .collection('PendingVisitSuppressions')
+        .doc(shrine.id)
+        .set({'markedAt': FieldValue.serverTimestamp()});
+  }
+
+  // ==========================================
+  // ⑮ プロフィールのアイコン画像URLを更新する関数
+  // ==========================================
+  Future<void> updateAvatarUrl(String userId, String url) async {
+    await _db.collection('Users').doc(userId).update({'avatarUrl': url});
+  }
+
+  // ==========================================
+  // ⑯ プロフィールの背景画像URLを更新する関数
+  // ==========================================
+  Future<void> updateCoverUrl(String userId, String url) async {
+    await _db.collection('Users').doc(userId).update({'coverUrl': url});
+  }
+
+  // ==========================================
+  // ⑰ ユーザーの参拝件数を取得する関数
+  // ==========================================
+  Future<int> getVisitsCount(String userId) async {
+    final snapshot = await _db
+        .collection('Users')
+        .doc(userId)
+        .collection('Visits')
+        .get();
+    return snapshot.size;
+  }
+
+  // ==========================================
+  // ⑱ ユーザーのすれ違い件数を取得する関数
+  // ==========================================
+  Future<int> getCrossingsCount(String userId) async {
+    final snapshot = await _db
+        .collection('Users')
+        .doc(userId)
+        .collection('Crossings')
+        .get();
+    return snapshot.size;
+  }
+
+  // ==========================================
+  // ⑲ ランダムな神社一覧を取得する関数
+  // ==========================================
+  Future<List<Shrine>> getRandomShrines({int limit = 5}) async {
+    final shrines = await getShrines();
+    shrines.shuffle();
+
+    if (shrines.length <= limit) {
+      return shrines;
+    }
+
+    return shrines.take(limit).toList();
   }
 }
