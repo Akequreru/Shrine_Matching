@@ -1,32 +1,34 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:device_preview/device_preview.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_floating_bottom_bar/flutter_floating_bottom_bar.dart';
 import 'package:shrine_matching/pages/home.dart';
-import 'package:shrine_matching/pages/diagnote.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
 import 'package:shrine_matching/pages/profile.dart';
-import 'package:shrine_matching/pages/type.dart';
 import 'package:shrine_matching/pages/map.dart';
 import 'package:shrine_matching/pages/bookmark.dart';
 import 'package:shrine_matching/pages/login.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shrine_matching/widgets/bottom_bar_visibility.dart';
+import 'package:shrine_matching/widgets/loading_ribbon_screen.dart';
+import 'package:shrine_matching/widgets/root_tab_selection.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-import 'package:shrine_matching/survices/app_globals.dart';
+import 'package:shrine_matching/services/app_globals.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // TaskHandler（バックグラウンドサービス）とアプリ本体が通信するためのポートを用意する
-  FlutterForegroundTask.initCommunicationPort();
+  if (!kIsWeb) {
+    FlutterForegroundTask.initCommunicationPort();
+  }
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Firestoreへの初回接続（WebChannelのハンドシェイク）はここで先に済ませておく。
   // 待たずに投げっぱなしにすることで、Home画面を見ている間に裏側で接続確立が進み、
@@ -44,6 +46,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       navigatorKey: rootNavigatorKey,
       debugShowCheckedModeBanner: false,
+      theme: ThemeData(scaffoldBackgroundColor: const Color(0xFFFEFEFE)),
       home: const AuthGate(),
     );
   }
@@ -61,7 +64,7 @@ class AuthGate extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const LoadingRibbonScreen();
         }
         if (snapshot.hasData) {
           return const RootTabsPage();
@@ -79,30 +82,87 @@ class RootTabsPage extends StatefulWidget {
   State<RootTabsPage> createState() => _RootTabsPageState();
 }
 
-class _RootTabsPageState extends State<RootTabsPage> with WidgetsBindingObserver {
-  final GlobalKey<HomePageWidgetState> _homeKey = GlobalKey<HomePageWidgetState>();
+class _RootTabsPageState extends State<RootTabsPage>
+    with WidgetsBindingObserver {
+  static const Color _selectedColor = Color(0xFFDB4713);
+  static const Color _unselectedColor = Color(0xFF7F7F7F);
+  static const double _tabItemWidth = 50;
+  static const double _tabItemGap = 6;
+  static const double _barHorizontalPadding = 12;
+  static const double _barVerticalPadding = 9;
+  final BottomBarController _bottomBarController = BottomBarController();
+
+  static const List<IconData> _tabIcons = [
+    CupertinoIcons.house_fill,
+    CupertinoIcons.map_fill,
+    CupertinoIcons.bookmark_fill,
+    CupertinoIcons.person_fill,
+  ];
+
+  final List<GlobalKey<NavigatorState>> _navigatorKeys = List.generate(
+    _tabIcons.length,
+    (_) => GlobalKey<NavigatorState>(),
+  );
+
+  Timer? _scrollIdleTimer;
+  int _currentIndex = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // バックグラウンドのすれ違い検知（ENTER）をリアルタイムで受け取り、
-    // タブに関係なくその場で参拝パネルを出せるようにする
-    FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
-    // アプリ起動直後にも一度チェックしておく
+    RootBottomBarVisibility.isVisible.addListener(
+      _handleBottomBarVisibilityChanged,
+    );
+    RootTabSelection.request.addListener(_handleRootTabSelectionRequested);
+
+    if (!kIsWeb) {
+      FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
+    }
+
+    _handleBottomBarVisibilityChanged();
     visitPromptService.checkNearbyShrineForVisit();
   }
 
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
-    super.dispose();
+  void _handleBottomBarVisibilityChanged() {
+    if (!mounted) {
+      return;
+    }
+    if (RootBottomBarVisibility.isVisible.value) {
+      _bottomBarController.show();
+    } else {
+      _bottomBarController.hide();
+    }
+  }
+
+  void _handleRootTabSelectionRequested() {
+    if (!mounted) {
+      return;
+    }
+
+    final request = RootTabSelection.request.value;
+    if (request == null) {
+      return;
+    }
+
+    final int requestedIndex = request.index;
+    if (requestedIndex < 0 || requestedIndex >= _tabIcons.length) {
+      return;
+    }
+
+    _navigatorKeys[requestedIndex].currentState?.popUntil(
+      (route) => route.isFirst,
+    );
+
+    if (requestedIndex != _currentIndex) {
+      setState(() {
+        _currentIndex = requestedIndex;
+      });
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // アプリをバックグラウンドから復帰させたときにも参拝パネルをチェックする
     if (state == AppLifecycleState.resumed) {
       visitPromptService.checkNearbyShrineForVisit();
     }
@@ -124,74 +184,191 @@ class _RootTabsPageState extends State<RootTabsPage> with WidgetsBindingObserver
     }
   }
 
+  bool _onScrollNotification(ScrollNotification notification) {
+    if (notification is ScrollStartNotification ||
+        notification is ScrollUpdateNotification ||
+        notification is OverscrollNotification) {
+      _scrollIdleTimer?.cancel();
+    }
+
+    if (notification is ScrollEndNotification) {
+      _scrollIdleTimer?.cancel();
+
+      // Bring the floating bar back once scrolling settles.
+      _scrollIdleTimer = Timer(const Duration(milliseconds: 300), () {
+        if (mounted && RootBottomBarVisibility.isVisible.value) {
+          _bottomBarController.show();
+        }
+      });
+    }
+
+    return false;
+  }
+
+  void _onTabPressed(int index) {
+    _navigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
+
+    if (index != _currentIndex) {
+      setState(() {
+        _currentIndex = index;
+      });
+    }
+  }
+
+  Widget _tabRootPage(int index) {
+    switch (index) {
+      case 0:
+        return const HomePageWidget();
+      case 1:
+        return const MapPage();
+      case 2:
+        return const BookmarkPage();
+      case 3:
+        return const ProfilePage();
+      default:
+        return const HomePageWidget();
+    }
+  }
+
+  Widget _buildTabNavigator(int index) {
+    return Navigator(
+      key: _navigatorKeys[index],
+      onGenerateRoute: (settings) {
+        return MaterialPageRoute(
+          builder: (_) => _tabRootPage(index),
+          settings: settings,
+        );
+      },
+    );
+  }
+
+  Widget _buildTabBody() {
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScrollNotification,
+      child: IndexedStack(
+        index: _currentIndex,
+        children: List.generate(_tabIcons.length, _buildTabNavigator),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _scrollIdleTimer?.cancel();
+    RootBottomBarVisibility.isVisible.removeListener(
+      _handleBottomBarVisibilityChanged,
+    );
+    RootTabSelection.request.removeListener(_handleRootTabSelectionRequested);
+    WidgetsBinding.instance.removeObserver(this);
+
+    if (!kIsWeb) {
+      FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
+    }
+
+    RootBottomBarVisibility.show();
+    _bottomBarController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return CupertinoTabScaffold(
-      tabBar: CupertinoTabBar(
-        activeColor: Color(0xFFDB4713),
-        onTap: (index) {
-          // どのタブに切り替えても参拝パネルの対象になり得るのでチェックする
-          visitPromptService.checkNearbyShrineForVisit();
-          // Homeタブに来たときは、すれ違いパネルも再チェックする。
-          // 参拝パネルの処理待ち（優先表示）はrefreshCrossings側で行っている
-          if (index == 0) {
-            _homeKey.currentState?.refreshCrossings();
-          }
-        },
-        items: [
-          BottomNavigationBarItem(
-            icon: Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
-              child: Icon(CupertinoIcons.house_fill),
-            ),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
-              child: Icon(CupertinoIcons.square_grid_2x2_fill),
-            ),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
-              child: Icon(CupertinoIcons.map_fill),
-            ),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
-              child: Icon(CupertinoIcons.bookmark_fill),
-            ),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
-              child: Icon(CupertinoIcons.person_fill),
-            ),
-            label: '',
-          ),
-        ],
-      ),
-      tabBuilder: (context, index) {
-        switch (index) {
-          case 0:
-            return CupertinoTabView(builder: (_) => HomePageWidget(key: _homeKey));
-          case 1:
-            return CupertinoTabView(builder: (_) => const TypePage());
-          case 2:
-            return CupertinoTabView(builder: (_) => const MapPage());
-          case 3:
-            return CupertinoTabView(builder: (_) => const BookmarkPage());
-          case 4:
-            return CupertinoTabView(builder: (_) => const ProfilePage());
-          default:
-            return CupertinoTabView(builder: (_) => HomePageWidget(key: _homeKey));
+    final double floatingBarWidth =
+        (_tabIcons.length * _tabItemWidth) +
+        ((_tabIcons.length - 1) * _tabItemGap) +
+        (_barHorizontalPadding * 2);
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          return;
         }
+
+        final NavigatorState? currentNavigator =
+            _navigatorKeys[_currentIndex].currentState;
+        if (currentNavigator != null && currentNavigator.canPop()) {
+          currentNavigator.pop();
+          return;
+        }
+
+        Navigator.of(context).maybePop();
       },
+      child: BottomBar(
+        controller: _bottomBarController,
+        showIcon: false,
+        layout: BottomBarLayout(
+          width: floatingBarWidth,
+          offset: 1,
+          borderRadius: BorderRadius.circular(9999),
+        ),
+        motion: const BottomBarMotion.cupertino(
+          preset: BottomBarCupertinoMotion.smooth,
+          duration: Duration(milliseconds: 360),
+          slideStart: Offset(0, 2.2),
+        ),
+        scrollBehavior: const BottomBarScrollBehavior(
+          hideOnScroll: true,
+          reverse: true,
+          deltaThreshold: 14,
+        ),
+        theme: BottomBarThemeData(
+          barDecoration: BoxDecoration(
+            color: const Color(0xFFFEFBF8),
+            borderRadius: BorderRadius.circular(9999),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.10),
+                blurRadius: 26,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+        ),
+        body: _buildTabBody(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: _barHorizontalPadding,
+            vertical: _barVerticalPadding,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_tabIcons.length, (index) {
+              final bool isSelected = index == _currentIndex;
+              final bool isLast = index == _tabIcons.length - 1;
+              return Padding(
+                padding: EdgeInsets.only(right: isLast ? 0 : _tabItemGap),
+                child: SizedBox(
+                  width: _tabItemWidth,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _onTabPressed(index),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 9,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? _selectedColor.withValues(alpha: 0.14)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(
+                        _tabIcons[index],
+                        size: isSelected ? 24 : 22,
+                        color: isSelected ? _selectedColor : _unselectedColor,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
     );
   }
 }

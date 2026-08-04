@@ -1,14 +1,15 @@
 import 'dart:async';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-import 'package:shrine_matching/survices/crossing_task_handler.dart';
-import 'package:shrine_matching/survices/firestore_service.dart';
+import 'package:shrine_matching/services/crossing_task_handler.dart';
+import 'package:shrine_matching/services/firestore_service.dart';
 import 'package:shrine_matching/models/shrine.dart';
 import 'package:shrine_matching/pages/shrineInfo.dart';
 
@@ -111,12 +112,8 @@ class _MapPageState extends State<MapPage> {
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => ShrineInfoPage(
-                            shrineName: shrine.name,
-                            description: shrine.concept,
-                            imageUrl: shrine.images.isNotEmpty
-                                ? shrine.images.first
-                                : 'https://picsum.photos/seed/shrineinfo/900/700',
-                            details: shrine.description,
+                            shrineId: shrine.id,
+                            initialShrine: shrine,
                           ),
                         ),
                       );
@@ -133,13 +130,15 @@ class _MapPageState extends State<MapPage> {
   }
 
   Future<void> _requestForegroundTaskPermissions() async {
+    if (kIsWeb) return;
+
     final notificationPermission =
         await FlutterForegroundTask.checkNotificationPermission();
     if (notificationPermission != NotificationPermission.granted) {
       await FlutterForegroundTask.requestNotificationPermission();
     }
 
-    if (Platform.isAndroid) {
+    if (defaultTargetPlatform == TargetPlatform.android) {
       if (!await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
         await FlutterForegroundTask.requestIgnoreBatteryOptimization();
       }
@@ -169,6 +168,14 @@ class _MapPageState extends State<MapPage> {
   }
 
   Future<void> _toggleCrossingService() async {
+    if (kIsWeb) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('すれ違い検知はAndroid/iOSのみ対応です')),
+      );
+      return;
+    }
+
     // 連打などで重複してstart/stopが走らないようにする
     if (_isTogglingCrossingService) return;
     _isTogglingCrossingService = true;

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shrine_matching/pages/matching.dart';
-import 'package:shrine_matching/survices/firestore_service.dart';
+import 'package:shrine_matching/services/firestore_service.dart';
 import 'package:shrine_matching/models/type_info.dart';
+import 'package:shrine_matching/widgets/bottom_bar_visibility.dart';
 
 class UserTypePage extends StatefulWidget {
   const UserTypePage({super.key, this.typeId, this.typeStr});
@@ -24,6 +26,38 @@ class _UserTypePageState extends State<UserTypePage> {
   bool _isLoadingType = false;
   TypeInfo? _typeInfo;
 
+  Color _typeAccentColor(String? typeName) {
+    const yellow = Color(0xFFF1BC1F);
+    const green = Color(0xFF5D8634);
+    const blue = Color(0xFF5095BF);
+    const purple = Color(0xFF906BAC);
+
+    switch (typeName) {
+      case '工芸職人':
+      case '流浪人':
+      case '旗手':
+      case '神楽師':
+        return yellow;
+      case '軍師':
+      case '仙人':
+      case '将軍':
+      case '発明家':
+        return green;
+      case '伝道師':
+      case '祈祷者':
+      case '師範':
+      case '吟遊詩人':
+        return blue;
+      case '防人':
+      case '庇護者':
+      case '船頭':
+      case '宿主':
+        return purple;
+      default:
+        return const Color(0xFFDB4713);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +78,10 @@ class _UserTypePageState extends State<UserTypePage> {
 
   @override
   Widget build(BuildContext context) {
+    final accentColor = _typeAccentColor(_typeInfo?.name);
+    final bottomScrollPadding = MediaQuery.of(context).padding.bottom + 120;
+    const contentHorizontalPadding = EdgeInsets.symmetric(horizontal: 12);
+
     return GestureDetector(
       onTap: () {
         FocusScope.of(context).unfocus();
@@ -51,16 +89,16 @@ class _UserTypePageState extends State<UserTypePage> {
       },
       child: Scaffold(
         key: scaffoldKey,
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFFEFEFE),
         body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  ClipRRect(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(20, 20, 20, bottomScrollPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Align(
+                  alignment: Alignment.center,
+                  child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Image.network(
                       _typeInfo?.image ??
@@ -72,85 +110,148 @@ class _UserTypePageState extends State<UserTypePage> {
                       fit: BoxFit.cover,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _typeInfo != null
-                        ? '${_typeInfo!.name}\n(${_typeInfo!.mbti})'
-                        : (widget.typeStr != null
-                            ? 'タイプ${widget.typeId}\n(${widget.typeStr})'
-                            : 'Sample Type'),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _typeInfo?.paraphrase ??
-                        (_isLoadingType
-                            ? ''
-                            : (widget.typeStr != null
-                                ? '※ここに詳細な説明文やイラストを配置します。'
-                                : 'Short description for this type\nConcept copy can go here.')),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(height: 20),
-                  if (_typeInfo != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _typeInfo!.concept,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            _typeInfo!.description,
-                            style: const TextStyle(color: Colors.black87, fontSize: 16),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            '旅のスタイル：${_typeInfo!.attitude}',
-                            style: const TextStyle(color: Colors.black87, fontSize: 16),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '好きなもの：${_typeInfo!.favorite}',
-                            style: const TextStyle(color: Colors.black87, fontSize: 16),
-                          ),
-                        ],
+                ),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: contentHorizontalPadding,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _typeInfo?.name ??
+                            (widget.typeStr != null
+                                ? 'タイプ${widget.typeId}'
+                                : 'Sample Type'),
+                        textAlign: TextAlign.left,
+                        style: GoogleFonts.zenOldMincho(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w600,
+                          color: accentColor,
+                        ),
                       ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _typeInfo?.paraphrase ??
+                            (_isLoadingType
+                                ? ''
+                                : (widget.typeStr != null
+                                      ? '※ここに詳細な説明文やイラストを配置します。'
+                                      : 'Short description for this type\nConcept copy can go here.')),
+                        textAlign: TextAlign.left,
+                        style: GoogleFonts.zenOldMincho(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: accentColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                if (_typeInfo != null)
+                  Padding(
+                    padding: contentHorizontalPadding,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'このタイプについて',
+                          textAlign: TextAlign.left,
+                          style: GoogleFonts.zenOldMincho(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w500,
+                            color: accentColor,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _typeInfo!.description,
+                          textAlign: TextAlign.left,
+                          style: GoogleFonts.zenKakuGothicNew(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          '大切にするもの',
+                          textAlign: TextAlign.left,
+                          style: GoogleFonts.zenOldMincho(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w500,
+                            color: accentColor,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _typeInfo!.attitude,
+                          textAlign: TextAlign.left,
+                          style: GoogleFonts.zenKakuGothicNew(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          'キーワード',
+                          textAlign: TextAlign.left,
+                          style: GoogleFonts.zenOldMincho(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w500,
+                            color: accentColor,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _typeInfo!.favorite,
+                          textAlign: TextAlign.left,
+                          style: GoogleFonts.zenKakuGothicNew(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
                     ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
+                  ),
+                const SizedBox(height: 24),
+                Align(
+                  alignment: Alignment.center,
+                  child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFDB4713),
+                      backgroundColor: accentColor,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(50),
                       ),
                     ),
                     onPressed: () {
+                      RootBottomBarVisibility.hide();
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => MatchingPage(typeId: widget.typeId)),
+                        MaterialPageRoute(
+                          builder: (_) => MatchingPage(typeId: widget.typeId),
+                        ),
                       );
                     },
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 12,
                       ),
-                      child: Text('Start Matching'),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Text('神社を見る', textAlign: TextAlign.center),
+                          SizedBox(width: 8),
+                          Icon(Icons.arrow_forward),
+                        ],
+                      ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),

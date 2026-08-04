@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shrine_matching/models/shrine.dart';
 import 'package:shrine_matching/pages/shrineInfo.dart';
-import 'package:shrine_matching/survices/firestore_service.dart';
+import 'package:shrine_matching/services/firestore_service.dart';
+import 'package:shrine_matching/widgets/loading_ribbon_screen.dart';
 
 class BookmarkPage extends StatelessWidget {
   const BookmarkPage({super.key});
@@ -56,97 +57,97 @@ class _BookmarkPageWidgetState extends State<BookmarkPageWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const LoadingRibbonScreen();
+    }
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFFEFEFE),
       body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _shrines.isEmpty
-                ? const Center(
-                    child: Text(
-                      'まだお気に入りの神社がありません',
-                      style: TextStyle(color: Colors.black54),
-                    ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
-                    itemCount: _shrines.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 14),
-                    itemBuilder: (context, index) {
-                      final shrine = _shrines[index];
-                      final imageUrl = shrine.images.isNotEmpty
-                          ? shrine.images.first
-                          : 'https://picsum.photos/seed/${shrine.id}/600';
-                      return InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => ShrineInfoPage(
-                                shrineName: shrine.name,
-                                description: shrine.concept,
-                                imageUrl: imageUrl,
-                                details: shrine.description,
-                              ),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF7F7F7),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  imageUrl,
-                                  width: 110,
-                                  height: 110,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      shrine.name,
-                                      style: const TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      shrine.concept,
-                                      style: const TextStyle(
-                                        color: Colors.black87,
-                                        height: 1.3,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    const Text(
-                                      'Tap to open details',
-                                      style: TextStyle(
-                                        color: Color(0xFFDB4713),
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+        child: _shrines.isEmpty
+            ? const Center(
+                child: Text(
+                  'まだお気に入りの神社がありません',
+                  style: TextStyle(color: Colors.black54),
+                ),
+              )
+            : ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
+                itemCount: _shrines.length,
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 14),
+                itemBuilder: (context, index) {
+                  final shrine = _shrines[index];
+                  final imageUrl = shrine.images.isNotEmpty
+                      ? shrine.images.first
+                      : 'https://picsum.photos/seed/${shrine.id}/600';
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ShrineInfoPage(
+                            shrineId: shrine.id,
+                            initialShrine: shrine,
                           ),
                         ),
                       );
                     },
-                  ),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF7F7F7),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              imageUrl,
+                              width: 110,
+                              height: 110,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  shrine.name,
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  shrine.concept,
+                                  style: const TextStyle(
+                                    color: Colors.black87,
+                                    height: 1.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Tap to open details',
+                                  style: TextStyle(
+                                    color: Color(0xFFDB4713),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
       ),
     );
   }

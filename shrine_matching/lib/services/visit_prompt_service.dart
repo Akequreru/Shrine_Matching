@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shrine_matching/models/shrine.dart';
-import 'package:shrine_matching/survices/firestore_service.dart';
+import 'package:shrine_matching/services/firestore_service.dart';
 
 // 参拝ボタンを出す判定に使う「近く」の半径（すれ違い検知と同じ100mに揃えている）
 const double _visitRadiusMeters = 100;

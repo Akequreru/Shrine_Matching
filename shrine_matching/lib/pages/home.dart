@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:shrine_matching/pages/diagnote.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shrine_matching/pages/matching.dart';
-import 'package:shrine_matching/survices/firestore_service.dart';
-import 'package:shrine_matching/survices/app_globals.dart';
+import 'package:shrine_matching/services/firestore_service.dart';
+import 'package:shrine_matching/services/app_globals.dart';
 import 'package:shrine_matching/models/crossing.dart';
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
+
+  static String routeName = 'HomePage';
+  static String routePath = '/homePage';
 
   @override
   State<HomePageWidget> createState() => HomePageWidgetState();
@@ -77,6 +80,55 @@ class HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
+  final List<_ShrineCardData> _matchedShrines = const [
+    _ShrineCardData(
+      imageUrl: 'https://picsum.photos/seed/matched_1/700/900',
+      name: '〇〇神社',
+      location: '京都市〇〇区',
+    ),
+    _ShrineCardData(
+      imageUrl: 'https://picsum.photos/seed/matched_2/700/900',
+      name: '〇〇神社',
+      location: '京都市〇〇区',
+    ),
+  ];
+
+  final List<_ShrineCardData> _recentShrines = const [
+    _ShrineCardData(
+      imageUrl: 'https://picsum.photos/seed/recent_1/500/500',
+      name: '〇〇神社',
+      location: '京都市〇〇区',
+    ),
+    _ShrineCardData(
+      imageUrl: 'https://picsum.photos/seed/recent_2/500/500',
+      name: '〇〇神社',
+      location: '京都市〇〇区',
+    ),
+    _ShrineCardData(
+      imageUrl: 'https://picsum.photos/seed/recent_3/500/500',
+      name: '〇〇神社',
+      location: '京都市〇〇区',
+    ),
+  ];
+
+  final List<_ShrineCardData> _sameTypeShrines = const [
+    _ShrineCardData(
+      imageUrl: 'https://picsum.photos/seed/type_1/500/500',
+      name: '〇〇神社',
+      location: '京都市〇〇区',
+    ),
+    _ShrineCardData(
+      imageUrl: 'https://picsum.photos/seed/type_2/500/500',
+      name: '〇〇神社',
+      location: '京都市〇〇区',
+    ),
+    _ShrineCardData(
+      imageUrl: 'https://picsum.photos/seed/type_3/500/500',
+      name: '〇〇神社',
+      location: '京都市〇〇区',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -86,65 +138,170 @@ class HomePageWidgetState extends State<HomePageWidget> {
       },
       child: Scaffold(
         key: scaffoldKey,
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Shrine Matching',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      'https://picsum.photos/seed/306/600',
-                      width: 300,
-                      height: 300,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Simple app description\nYour concept copy can go here.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFDB4713),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(50),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const DiagnosticScreen()),
-                      );
-                    },
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: Text('Find my shrine type'),
-                    ),
-                  ),
-                ],
+        backgroundColor: const Color(0xFFFEFEFE),
+        body: ListView(
+          primary: true,
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 50, 0, 110),
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'ホーム',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.zenKakuGothicNew(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
-          ),
+            const SizedBox(height: 20),
+            _ShrineSection(
+              title: 'あなたへが縁を結んだ神社',
+              cards: _matchedShrines,
+              imageWidth: 220,
+              imageHeight: 289,
+            ),
+            const SizedBox(height: 20),
+            _ShrineSection(
+              title: '最近すれちがった神社',
+              cards: _recentShrines,
+              imageWidth: 160,
+              imageHeight: 160,
+            ),
+            const SizedBox(height: 20),
+            _ShrineSection(
+              title: '同じ○○タイプの神社',
+              cards: _sameTypeShrines,
+              imageWidth: 160,
+              imageHeight: 160,
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+class _ShrineSection extends StatelessWidget {
+  const _ShrineSection({
+    required this.title,
+    required this.cards,
+    required this.imageWidth,
+    required this.imageHeight,
+  });
+
+  final String title;
+  final List<_ShrineCardData> cards;
+  final double imageWidth;
+  final double imageHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.zenOldMincho(
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 5),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: List.generate(cards.length, (index) {
+              final card = cards[index];
+              return Padding(
+                padding: EdgeInsets.only(
+                  right: index == cards.length - 1 ? 20 : 10,
+                ),
+                child: _ShrineCard(
+                  data: card,
+                  imageWidth: imageWidth,
+                  imageHeight: imageHeight,
+                ),
+              );
+            }),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ShrineCard extends StatelessWidget {
+  const _ShrineCard({
+    required this.data,
+    required this.imageWidth,
+    required this.imageHeight,
+  });
+
+  final _ShrineCardData data;
+  final double imageWidth;
+  final double imageHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            data.imageUrl,
+            width: imageWidth,
+            height: imageHeight,
+            fit: BoxFit.cover,
+          ),
+        ),
+        const SizedBox(height: 6),
+        SizedBox(
+          width: imageWidth,
+          child: Text(
+            data.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.zenOldMincho(
+              fontSize: 16,
+              fontWeight: FontWeight.w400,
+              color: const Color(0xFF6D666B),
+            ),
+          ),
+        ),
+        SizedBox(
+          width: imageWidth,
+          child: Text(
+            data.location,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.zenOldMincho(
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              color: const Color(0xFFA9A2A7),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ShrineCardData {
+  const _ShrineCardData({
+    required this.imageUrl,
+    required this.name,
+    required this.location,
+  });
+
+  final String imageUrl;
+  final String name;
+  final String location;
 }
 
 class _CrossingCard extends StatelessWidget {
@@ -154,7 +311,7 @@ class _CrossingCard extends StatelessWidget {
   final List<String> allShrineIds;
 
   String _formatDateTime(DateTime dt) {
-    final two = (int n) => n.toString().padLeft(2, '0');
+    String two(int n) => n.toString().padLeft(2, '0');
     return '${dt.month}/${dt.day} ${two(dt.hour)}:${two(dt.minute)}';
   }
 

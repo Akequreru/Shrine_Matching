@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shrine_matching/survices/firestore_service.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shrine_matching/models/shrine.dart';
+import 'package:shrine_matching/pages/matching_complete.dart';
+import 'package:shrine_matching/pages/shrineInfo.dart';
+import 'package:shrine_matching/services/firestore_service.dart';
+import 'package:shrine_matching/widgets/bottom_bar_visibility.dart';
+import 'package:shrine_matching/widgets/loading_ribbon_screen.dart';
 
 class MatchingPage extends StatelessWidget {
   const MatchingPage({super.key, this.typeId, this.shrineIds});
@@ -32,6 +37,23 @@ class MatchingPageWidget extends StatefulWidget {
 }
 
 class _MatchingPageWidgetState extends State<MatchingPageWidget> {
+  static const List<String> _placeholderImages = <String>[
+    'https://picsum.photos/seed/199/900/700',
+    'https://picsum.photos/seed/134/900/700',
+    'https://picsum.photos/seed/43/900/700',
+  ];
+  static const List<String> _placeholderTags = <String>['#開運'];
+  static const String _placeholderName = '○○神社';
+  static const String _placeholderSaijin = '祭神';
+  static const String _placeholderAddress = '京都市上京区京都市上京区染殿町680';
+  static const String _placeholderConcept =
+      '常に前進を楽しむ「○○タイプ」のあなたには、勝負の神様を祀るこの神社の力強い気がぴったりです。';
+
+  static const Color _yellowTypeColor = Color(0xFFF1BC1F);
+  static const Color _greenTypeColor = Color(0xFF5D8634);
+  static const Color _blueTypeColor = Color(0xFF5095BF);
+  static const Color _purpleTypeColor = Color(0xFF906BAC);
+
   final FirestoreService _firestoreService = FirestoreService();
 
   bool _isLoading = true;
@@ -41,43 +63,38 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
   @override
   void initState() {
     super.initState();
+    RootBottomBarVisibility.hide();
     _loadMatches();
+  }
+
+  @override
+  void dispose() {
+    RootBottomBarVisibility.show();
+    super.dispose();
   }
 
   Future<void> _loadMatches() async {
     final shrines = await _firestoreService.getShrinesWithKami();
-
     List<_MatchingCardData> cards;
     if (widget.shrineIds != null) {
-      // すれ違った神社を、渡された順番のまま並べる（タイプでの絞り込みは行わない）
-      final shrineById = {for (final s in shrines) s.id: s};
+      // すれ違い経由のときは、受け取った順番のまま表示する
+      final shrineById = {for (final shrine in shrines) shrine.id: shrine};
       cards = widget.shrineIds!
           .map((id) => shrineById[id])
           .whereType<Shrine>()
-          .where((shrine) => shrine.images.isNotEmpty)
-          .map((shrine) => _MatchingCardData(
-                id: shrine.id,
-                name: shrine.name,
-                description: shrine.concept,
-                images: shrine.images,
-              ))
+          .map(_toCardData)
           .toList();
     } else {
       final matched = shrines.where((shrine) {
         if (widget.typeId == null) return true;
         return shrine.kami.any((k) => k.matchTypes.contains(widget.typeId));
       });
-      cards = matched
-          .where((shrine) => shrine.images.isNotEmpty)
-          .map((shrine) => _MatchingCardData(
-                id: shrine.id,
-                name: shrine.name,
-                description: shrine.concept,
-                images: shrine.images,
-              ))
-          .toList();
+      cards = matched.map(_toCardData).toList();
     }
 
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _cards = cards;
       _hadAnyMatches = _cards.isNotEmpty;
@@ -85,18 +102,49 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
     });
   }
 
-  final Map<String, int> _imageIndexByCard = <String, int>{};
+  _MatchingCardData _toCardData(Shrine shrine) {
+    final deityNames = shrine.kami
+        .map((kami) => kami.name.trim())
+        .where((name) => name.isNotEmpty)
+        .toList();
+    final imageUrls = shrine.images
+        .map((image) => image.trim())
+        .where((image) => image.isNotEmpty)
+        .toList();
+    final normalizedTags = shrine.tags
+        .map(_normalizeTag)
+        .where((tag) => tag.isNotEmpty)
+        .toList();
+
+    return _MatchingCardData(
+      shrine: shrine,
+      id: shrine.id,
+      name: _hasText(shrine.name) ? shrine.name : _placeholderName,
+      saijin: deityNames.isNotEmpty ? deityNames.join('・') : _placeholderSaijin,
+      address: _hasText(shrine.address) ? shrine.address : _placeholderAddress,
+      concept: _hasText(shrine.concept) ? shrine.concept : _placeholderConcept,
+      images: imageUrls.isNotEmpty ? imageUrls : _placeholderImages,
+      tags: normalizedTags.isNotEmpty ? normalizedTags : _placeholderTags,
+      accentColor: _resolveAccentColorForShrine(shrine),
+    );
+  }
+
   final Set<String> _favoriteShrineIds = <String>{};
   int _swipeCycle = 0;
   Offset _dragOffset = Offset.zero;
   bool _isDragging = false;
   bool _isAnimatingOut = false;
+  bool _isNavigatingResult = false;
+  String? _lastShrineImageUrl;
 
   void _removeFrontCard() {
     if (_cards.isEmpty) {
       return;
     }
 
+    if (_cards.first.images.isNotEmpty) {
+      _lastShrineImageUrl = _cards.first.images.first;
+    }
     _cards.removeAt(0);
     _swipeCycle++;
   }
@@ -122,9 +170,32 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
     );
   }
 
+  Future<void> _showResultAfterLastSwipe() async {
+    if (_isNavigatingResult) {
+      return;
+    }
+
+    _isNavigatingResult = true;
+    await _saveFavoritesIfNeeded();
+
+    if (!mounted) {
+      return;
+    }
+
+    await Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => MatchCompletePage(shrineImageUrl: _lastShrineImageUrl),
+      ),
+    );
+  }
+
   void _animateSwipeOut({required bool toRight, required double cardWidth}) {
     if (_isAnimatingOut) {
       return;
+    }
+
+    if (toRight) {
+      _favoriteFrontCard();
     }
 
     final double targetX = toRight ? cardWidth * 1.5 : -cardWidth * 1.5;
@@ -134,7 +205,7 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
       _dragOffset = Offset(targetX, _dragOffset.dy * 0.2);
     });
 
-    Future<void>.delayed(const Duration(milliseconds: 220), () {
+    Future<void>.delayed(const Duration(milliseconds: 220), () async {
       if (!mounted) {
         return;
       }
@@ -145,8 +216,12 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
         _isAnimatingOut = false;
       });
       if (_cards.isEmpty) {
-        _saveFavoritesIfNeeded();
-        _returnToHomeWhenFinished();
+        if (widget.shrineIds != null) {
+          await _saveFavoritesIfNeeded();
+          _returnToHomeWhenFinished();
+        } else {
+          await _showResultAfterLastSwipe();
+        }
       }
     });
   }
@@ -176,39 +251,84 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
     });
   }
 
-  void _showNextImage(_MatchingCardData card) {
-    final int current = _imageIndexByCard[card.name] ?? 0;
-    final int next = (current + 1) % card.images.length;
-    setState(() {
-      _imageIndexByCard[card.name] = next;
-    });
+  bool _hasText(String? value) => value != null && value.trim().isNotEmpty;
+
+  String _normalizeTag(String tag) {
+    final trimmed = tag.trim();
+    if (!_hasText(trimmed)) {
+      return '';
+    }
+    return trimmed.startsWith('#') ? trimmed : '#$trimmed';
   }
 
-  void _showPreviousImage(_MatchingCardData card) {
-    final int current = _imageIndexByCard[card.name] ?? 0;
-    final int previous =
-        (current - 1 + card.images.length) % card.images.length;
-    setState(() {
-      _imageIndexByCard[card.name] = previous;
-    });
+  Color _colorByTypeId(int? typeId) {
+    if (typeId == null || typeId <= 0) {
+      return _greenTypeColor;
+    }
+
+    if (<int>{13, 15, 5, 7}.contains(typeId)) {
+      return _yellowTypeColor;
+    }
+    if (<int>{10, 14, 2, 6}.contains(typeId)) {
+      return _greenTypeColor;
+    }
+    if (<int>{12, 16, 4, 8}.contains(typeId)) {
+      return _blueTypeColor;
+    }
+    if (<int>{9, 11, 1, 3}.contains(typeId)) {
+      return _purpleTypeColor;
+    }
+    return _greenTypeColor;
+  }
+
+  Color _resolveAccentColorForShrine(Shrine shrine) {
+    int? matchedDeityTypeId;
+
+    if (widget.typeId != null && widget.typeId! > 0) {
+      for (final kami in shrine.kami) {
+        if (kami.matchTypes.contains(widget.typeId) && kami.type > 0) {
+          matchedDeityTypeId = kami.type;
+          break;
+        }
+      }
+    }
+
+    if (matchedDeityTypeId == null) {
+      for (final kami in shrine.kami) {
+        if (kami.type > 0) {
+          matchedDeityTypeId = kami.type;
+          break;
+        }
+      }
+    }
+
+    return _colorByTypeId(matchedDeityTypeId);
+  }
+
+  void _openShrineInfo(_MatchingCardData card) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            ShrineInfoPage(shrineId: card.id, initialShrine: card.shrine),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFFF5F5F5),
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const LoadingRibbonScreen();
     }
 
     if (_cards.isEmpty) {
+      if (_hadAnyMatches && _isNavigatingResult) {
+        return const LoadingRibbonScreen();
+      }
+
       return Scaffold(
-        backgroundColor: const Color(0xFFF5F5F5),
+        backgroundColor: const Color(0xFFFEFEFE),
         body: Center(
-          child: Text(
-            _hadAnyMatches ? 'すべての神社を見終わりました' : '相性の良い神社が見つかりませんでした',
-          ),
+          child: Text(_hadAnyMatches ? 'すべての神社を見終わりました' : '相性の良い神社が見つかりませんでした'),
         ),
       );
     }
@@ -217,37 +337,47 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
     final _MatchingCardData? backCard = _cards.length > 1 ? _cards[1] : null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: const Color(0xFFFEFEFE),
       body: SafeArea(
+        top: true,
+        bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
+          padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
           child: Column(
             children: [
               Row(
                 children: [
                   IconButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                    color: const Color(0xFFDB4713),
+                    onPressed: () {
+                      RootBottomBarVisibility.show();
+                      Navigator.of(context).maybePop();
+                    },
+                    icon: const Icon(Icons.arrow_back),
+                    color: Colors.black,
                   ),
-                  const SizedBox(width: 4),
-                  const Text(
-                    'Matching',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                  Expanded(
+                    child: Text(
+                      'おすすめ',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.zenKakuGothicNew(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                      ),
+                    ),
                   ),
+                  const SizedBox(width: 48),
                 ],
               ),
               const SizedBox(height: 8),
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
+                    final double cardWidth = constraints.maxWidth * 0.94;
+                    final double cardHeight = constraints.maxHeight * 0.90;
                     final double dragProgress =
-                        (_dragOffset.dx.abs() / constraints.maxWidth).clamp(
-                          0.0,
-                          1.0,
-                        );
-                    final double rotation =
-                        (_dragOffset.dx / constraints.maxWidth) * 0.22;
+                        (_dragOffset.dx.abs() / cardWidth).clamp(0.0, 1.0);
+                    final double rotation = (_dragOffset.dx / cardWidth) * 0.22;
 
                     return Stack(
                       alignment: Alignment.center,
@@ -260,15 +390,12 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
                               child: Opacity(
                                 opacity: 0.62 + (0.23 * dragProgress),
                                 child: SizedBox(
-                                  height: constraints.maxHeight,
+                                  width: cardWidth,
+                                  height: cardHeight,
                                   child: _MatchingCard(
                                     card: backCard,
-                                    imageIndex:
-                                        _imageIndexByCard[backCard.name] ?? 0,
-                                    onNextImage: () => _showNextImage(backCard),
-                                    onPreviousImage: () =>
-                                        _showPreviousImage(backCard),
-                                    canChangeImage: false,
+                                    onOpenBasicInfo: () =>
+                                        _openShrineInfo(backCard),
                                   ),
                                 ),
                               ),
@@ -297,7 +424,7 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
                             });
                           },
                           onPanEnd: (details) =>
-                              _onCardPanEnd(details, constraints.maxWidth),
+                              _onCardPanEnd(details, cardWidth),
                           child: AnimatedContainer(
                             key: ValueKey('front_transform_$_swipeCycle'),
                             duration: Duration(
@@ -314,16 +441,13 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
                               ..rotateZ(rotation),
                             transformAlignment: Alignment.topCenter,
                             child: SizedBox(
-                              height: constraints.maxHeight,
+                              width: cardWidth,
+                              height: cardHeight,
                               child: _MatchingCard(
                                 key: ValueKey('${frontCard.name}_$_swipeCycle'),
                                 card: frontCard,
-                                imageIndex:
-                                    _imageIndexByCard[frontCard.name] ?? 0,
-                                onNextImage: () => _showNextImage(frontCard),
-                                onPreviousImage: () =>
-                                    _showPreviousImage(frontCard),
-                                canChangeImage: true,
+                                onOpenBasicInfo: () =>
+                                    _openShrineInfo(frontCard),
                               ),
                             ),
                           ),
@@ -331,40 +455,6 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
                       ],
                     );
                   },
-                ),
-              ),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    IconButton(
-                      onPressed: () => _animateSwipeOut(
-                        toRight: false,
-                        cardWidth: MediaQuery.sizeOf(context).width,
-                      ),
-                      icon: const Icon(Icons.arrow_back),
-                    ),
-                    IconButton(
-                      onPressed: () {
-                        _favoriteFrontCard();
-                        _animateSwipeOut(
-                          toRight: true,
-                          cardWidth: MediaQuery.sizeOf(context).width,
-                        );
-                      },
-                      icon: const Icon(Icons.stars_rounded),
-                      color: Colors.amber,
-                    ),
-                    IconButton(
-                      onPressed: () => _animateSwipeOut(
-                        toRight: true,
-                        cardWidth: MediaQuery.sizeOf(context).width,
-                      ),
-                      icon: const Icon(Icons.arrow_forward),
-                    ),
-                  ],
                 ),
               ),
             ],
@@ -379,85 +469,169 @@ class _MatchingCard extends StatelessWidget {
   const _MatchingCard({
     super.key,
     required this.card,
-    required this.imageIndex,
-    required this.onNextImage,
-    required this.onPreviousImage,
-    required this.canChangeImage,
+    required this.onOpenBasicInfo,
   });
 
   final _MatchingCardData card;
-  final int imageIndex;
-  final VoidCallback onNextImage;
-  final VoidCallback onPreviousImage;
-  final bool canChangeImage;
+  final VoidCallback onOpenBasicInfo;
 
   @override
   Widget build(BuildContext context) {
+    final visibleTags = card.tags.take(6).toList();
+
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      elevation: 0.5,
+      color: const Color(0xFFFEFEFE),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFFE6E3DE)),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AspectRatio(
-              aspectRatio: 16 / 10,
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.network(
-                      card.images[imageIndex],
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  if (canChangeImage)
-                    Positioned.fill(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _ImageNavButton(
-                            icon: Icons.chevron_left_rounded,
-                            onPressed: onPreviousImage,
-                          ),
-                          _ImageNavButton(
-                            icon: Icons.chevron_right_rounded,
-                            onPressed: onNextImage,
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
             Text(
               card.name,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.zenOldMincho(
+                fontSize: 34,
+                fontWeight: FontWeight.w600,
+                color: card.accentColor,
+                height: 1.06,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '祭神 ${card.saijin}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.zenOldMincho(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: card.accentColor,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  card.images.first,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: const Color(0xFFE9E9E9),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.broken_image_outlined,
+                        color: Colors.black45,
+                        size: 38,
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
             const SizedBox(height: 10),
-            Text(
-              card.description,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, color: Colors.black87),
-            ),
-            const Spacer(),
             Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List<Widget>.generate(card.images.length, (index) {
-                final bool isActive = index == imageIndex;
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Text(
+                    card.address,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.zenKakuGothicNew(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.black54,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.location_on_rounded,
+                  color: Color(0xFF7A767B),
+                  size: 30,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              card.concept,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.zenOldMincho(
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+                color: Colors.black87,
+                height: 1.65,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: visibleTags.map((tag) {
                 return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  width: isActive ? 18 : 8,
-                  height: 8,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: isActive ? const Color(0xFFDB4713) : Colors.black26,
+                    border: Border.all(
+                      color: card.accentColor.withValues(alpha: 0.45),
+                    ),
                     borderRadius: BorderRadius.circular(999),
                   ),
+                  child: Text(
+                    tag,
+                    style: GoogleFonts.zenKakuGothicNew(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: card.accentColor,
+                      height: 1.2,
+                    ),
+                  ),
                 );
-              }),
+              }).toList(),
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.center,
+              child: OutlinedButton(
+                onPressed: onOpenBasicInfo,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF7A767B),
+                  side: BorderSide(
+                    color: card.accentColor.withValues(alpha: 0.4),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  textStyle: GoogleFonts.zenKakuGothicNew(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Text('基本情報を見る'),
+                    SizedBox(width: 2),
+                    Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -466,42 +640,26 @@ class _MatchingCard extends StatelessWidget {
   }
 }
 
-class _ImageNavButton extends StatelessWidget {
-  const _ImageNavButton({required this.icon, required this.onPressed});
-
-  final IconData icon;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.black38,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: IconButton(
-          onPressed: onPressed,
-          icon: Icon(icon),
-          color: Colors.white,
-          splashRadius: 20,
-        ),
-      ),
-    );
-  }
-}
-
 class _MatchingCardData {
   const _MatchingCardData({
+    required this.shrine,
     required this.id,
     required this.name,
-    required this.description,
+    required this.saijin,
+    required this.address,
+    required this.concept,
     required this.images,
+    required this.tags,
+    required this.accentColor,
   });
 
+  final Shrine shrine;
   final String id;
   final String name;
-  final String description;
+  final String saijin;
+  final String address;
+  final String concept;
   final List<String> images;
+  final List<String> tags;
+  final Color accentColor;
 }
