@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:device_preview/device_preview.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -17,9 +18,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shrine_matching/widgets/bottom_bar_visibility.dart';
 import 'package:shrine_matching/widgets/loading_ribbon_screen.dart';
 import 'package:shrine_matching/widgets/root_tab_selection.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:shrine_matching/services/app_globals.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (!kIsWeb) {
+    FlutterForegroundTask.initCommunicationPort();
+  }
+
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Firestoreへの初回接続（WebChannelのハンドシェイク）はここで先に済ませておく。
@@ -36,9 +44,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: rootNavigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(scaffoldBackgroundColor: const Color(0xFFFEFEFE)),
-      home: AuthGate(),
+      home: const AuthGate(),
     );
   }
 }
@@ -73,7 +82,8 @@ class RootTabsPage extends StatefulWidget {
   State<RootTabsPage> createState() => _RootTabsPageState();
 }
 
-class _RootTabsPageState extends State<RootTabsPage> {
+class _RootTabsPageState extends State<RootTabsPage>
+    with WidgetsBindingObserver {
   static const Color _selectedColor = Color(0xFFDB4713);
   static const Color _unselectedColor = Color(0xFF7F7F7F);
   static const double _tabItemWidth = 50;
@@ -100,11 +110,18 @@ class _RootTabsPageState extends State<RootTabsPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     RootBottomBarVisibility.isVisible.addListener(
       _handleBottomBarVisibilityChanged,
     );
     RootTabSelection.request.addListener(_handleRootTabSelectionRequested);
+
+    if (!kIsWeb) {
+      FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
+    }
+
     _handleBottomBarVisibilityChanged();
+    visitPromptService.checkNearbyShrineForVisit();
   }
 
   void _handleBottomBarVisibilityChanged() {
@@ -141,6 +158,29 @@ class _RootTabsPageState extends State<RootTabsPage> {
       setState(() {
         _currentIndex = requestedIndex;
       });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      visitPromptService.checkNearbyShrineForVisit();
+    }
+  }
+
+  void _onReceiveTaskData(Object data) {
+    if (data is! Map) return;
+
+    if (data['type'] == 'nearbyShrineEnter') {
+      visitPromptService.showPromptForShrineData(
+        shrineId: data['shrineId'] as String? ?? '',
+        shrineName: data['shrineName'] as String? ?? '',
+        image: data['image'] as String? ?? '',
+        tags: List<String>.from(data['tags'] ?? []),
+        address: data['address'] as String? ?? '',
+      );
+    } else if (data['type'] == 'nearbyShrineExit') {
+      visitPromptService.clearPromptedShrine(data['shrineId'] as String? ?? '');
     }
   }
 
@@ -219,6 +259,12 @@ class _RootTabsPageState extends State<RootTabsPage> {
       _handleBottomBarVisibilityChanged,
     );
     RootTabSelection.request.removeListener(_handleRootTabSelectionRequested);
+    WidgetsBinding.instance.removeObserver(this);
+
+    if (!kIsWeb) {
+      FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
+    }
+
     RootBottomBarVisibility.show();
     _bottomBarController.dispose();
     super.dispose();

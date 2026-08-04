@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/shrine.dart';
 import '../models/question.dart';
 import '../models/app_user.dart';
 import '../models/kami.dart';     // ★変更：kami.dart
 import '../models/history.dart';  // ★変更：history.dart
 import '../models/type_info.dart';
+import '../models/crossing.dart';
 
 class FirestoreService {
   // Firestoreのインスタンス（通信窓口）を変数にしておく
@@ -216,5 +218,68 @@ class FirestoreService {
         .toList();
     types.sort((a, b) => a.id.compareTo(b.id));
     return types;
+  }
+
+  // ==========================================
+  // ⑫ 前回確認していない「すれ違い」記録を取得する関数
+  // ==========================================
+  Future<List<Crossing>> getUnseenCrossings() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return [];
+
+    final snapshot = await _db
+        .collection('Users')
+        .doc(uid)
+        .collection('Crossings')
+        .where('seen', isEqualTo: false)
+        .orderBy('crossedAt', descending: true)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => Crossing.fromFirestore(doc.data(), doc.id))
+        .toList();
+  }
+
+  // ==========================================
+  // ⑬ 「すれ違い」記録を確認済みにする関数
+  // ==========================================
+  Future<void> markCrossingsAsSeen(List<String> crossingIds) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || crossingIds.isEmpty) return;
+
+    final batch = _db.batch();
+    for (final id in crossingIds) {
+      batch.update(
+        _db.collection('Users').doc(uid).collection('Crossings').doc(id),
+        {'seen': true},
+      );
+    }
+    await batch.commit();
+  }
+
+  // ==========================================
+  // ⑭ 参拝を記録する関数
+  // ==========================================
+  Future<void> recordVisit(Shrine shrine) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    await _db.collection('Users').doc(uid).collection('Visits').add({
+      'shrineId': shrine.id,
+      'shrineName': shrine.name,
+      'image': shrine.images.isNotEmpty ? shrine.images.first : '',
+      'tags': shrine.tags,
+      'address': shrine.address,
+      'visitedAt': FieldValue.serverTimestamp(),
+    });
+
+    // 参拝した神社は、次にそこから離れたときに「すれ違い」として二重に
+    // 記録されないよう、印を残しておく（バックグラウンド側のEXIT検知で消費する）
+    await _db
+        .collection('Users')
+        .doc(uid)
+        .collection('PendingVisitSuppressions')
+        .doc(shrine.id)
+        .set({'markedAt': FieldValue.serverTimestamp()});
   }
 }

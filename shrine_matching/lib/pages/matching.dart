@@ -9,21 +9,25 @@ import 'package:shrine_matching/widgets/bottom_bar_visibility.dart';
 import 'package:shrine_matching/widgets/loading_ribbon_screen.dart';
 
 class MatchingPage extends StatelessWidget {
-  const MatchingPage({super.key, this.typeId});
+  const MatchingPage({super.key, this.typeId, this.shrineIds});
 
   // 診断結果のタイプID（未診断で開かれた場合はnull＝全件表示）
   final int? typeId;
 
+  // すれ違いパネルから開かれたときだけ指定される。指定時はこの神社たちを順番に表示する
+  final List<String>? shrineIds;
+
   @override
   Widget build(BuildContext context) {
-    return MatchingPageWidget(typeId: typeId);
+    return MatchingPageWidget(typeId: typeId, shrineIds: shrineIds);
   }
 }
 
 class MatchingPageWidget extends StatefulWidget {
-  const MatchingPageWidget({super.key, this.typeId});
+  const MatchingPageWidget({super.key, this.typeId, this.shrineIds});
 
   final int? typeId;
+  final List<String>? shrineIds;
 
   static String routeName = 'MatchingPage';
   static String routePath = '/matchingPage';
@@ -71,48 +75,58 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
 
   Future<void> _loadMatches() async {
     final shrines = await _firestoreService.getShrinesWithKami();
+    List<_MatchingCardData> cards;
+    if (widget.shrineIds != null) {
+      // すれ違い経由のときは、受け取った順番のまま表示する
+      final shrineById = {for (final shrine in shrines) shrine.id: shrine};
+      cards = widget.shrineIds!
+          .map((id) => shrineById[id])
+          .whereType<Shrine>()
+          .map(_toCardData)
+          .toList();
+    } else {
+      final matched = shrines.where((shrine) {
+        if (widget.typeId == null) return true;
+        return shrine.kami.any((k) => k.matchTypes.contains(widget.typeId));
+      });
+      cards = matched.map(_toCardData).toList();
+    }
 
-    final matched = shrines.where((shrine) {
-      if (widget.typeId == null) return true;
-      return shrine.kami.any((k) => k.matchTypes.contains(widget.typeId));
-    });
-
+    if (!mounted) {
+      return;
+    }
     setState(() {
-      _cards = matched.map((shrine) {
-        final deityNames = shrine.kami
-            .map((kami) => kami.name.trim())
-            .where((name) => name.isNotEmpty)
-            .toList();
-        final imageUrls = shrine.images
-            .map((image) => image.trim())
-            .where((image) => image.isNotEmpty)
-            .toList();
-        final normalizedTags = shrine.tags
-            .map(_normalizeTag)
-            .where((tag) => tag.isNotEmpty)
-            .toList();
-
-        return _MatchingCardData(
-          shrine: shrine,
-          id: shrine.id,
-          name: _hasText(shrine.name) ? shrine.name : _placeholderName,
-          saijin: deityNames.isNotEmpty
-              ? deityNames.join('・')
-              : _placeholderSaijin,
-          address: _hasText(shrine.address)
-              ? shrine.address
-              : _placeholderAddress,
-          concept: _hasText(shrine.concept)
-              ? shrine.concept
-              : _placeholderConcept,
-          images: imageUrls.isNotEmpty ? imageUrls : _placeholderImages,
-          tags: normalizedTags.isNotEmpty ? normalizedTags : _placeholderTags,
-          accentColor: _resolveAccentColorForShrine(shrine),
-        );
-      }).toList();
+      _cards = cards;
       _hadAnyMatches = _cards.isNotEmpty;
       _isLoading = false;
     });
+  }
+
+  _MatchingCardData _toCardData(Shrine shrine) {
+    final deityNames = shrine.kami
+        .map((kami) => kami.name.trim())
+        .where((name) => name.isNotEmpty)
+        .toList();
+    final imageUrls = shrine.images
+        .map((image) => image.trim())
+        .where((image) => image.isNotEmpty)
+        .toList();
+    final normalizedTags = shrine.tags
+        .map(_normalizeTag)
+        .where((tag) => tag.isNotEmpty)
+        .toList();
+
+    return _MatchingCardData(
+      shrine: shrine,
+      id: shrine.id,
+      name: _hasText(shrine.name) ? shrine.name : _placeholderName,
+      saijin: deityNames.isNotEmpty ? deityNames.join('・') : _placeholderSaijin,
+      address: _hasText(shrine.address) ? shrine.address : _placeholderAddress,
+      concept: _hasText(shrine.concept) ? shrine.concept : _placeholderConcept,
+      images: imageUrls.isNotEmpty ? imageUrls : _placeholderImages,
+      tags: normalizedTags.isNotEmpty ? normalizedTags : _placeholderTags,
+      accentColor: _resolveAccentColorForShrine(shrine),
+    );
   }
 
   final Set<String> _favoriteShrineIds = <String>{};
@@ -202,8 +216,21 @@ class _MatchingPageWidgetState extends State<MatchingPageWidget> {
         _isAnimatingOut = false;
       });
       if (_cards.isEmpty) {
-        await _showResultAfterLastSwipe();
+        if (widget.shrineIds != null) {
+          await _saveFavoritesIfNeeded();
+          _returnToHomeWhenFinished();
+        } else {
+          await _showResultAfterLastSwipe();
+        }
       }
+    });
+  }
+
+  // 最後まで見終わったら、少し間を置いてHome画面（タブのルート）まで戻る
+  void _returnToHomeWhenFinished() {
+    Future<void>.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
     });
   }
 
