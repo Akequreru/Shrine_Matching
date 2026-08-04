@@ -248,36 +248,6 @@ class _MapPageState extends State<MapPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Map'),
-        actions: [
-          IconButton(
-            onPressed: () {
-              if (!_showOnlyFavorites) {
-                // お気に入りだけ表示するモードに入る直前に最新化しておく
-                _loadFavorites();
-              }
-              setState(() {
-                _showOnlyFavorites = !_showOnlyFavorites;
-              });
-            },
-            icon: Icon(
-              _showOnlyFavorites ? Icons.star : Icons.star_border,
-              color: Colors.amber,
-            ),
-            tooltip: _showOnlyFavorites ? 'すべての神社を表示' : 'お気に入りのみ表示',
-          ),
-          IconButton(
-            onPressed: _toggleCrossingService,
-            icon: Icon(
-              _isCrossingServiceRunning
-                  ? Icons.notifications_active
-                  : Icons.notifications_off_outlined,
-            ),
-            tooltip: _isCrossingServiceRunning ? 'すれ違い検知を停止' : 'すれ違い検知を開始',
-          ),
-        ],
-      ),
       body: FlutterMap(
         options: MapOptions(
           initialCenter: _kyotoCenter,

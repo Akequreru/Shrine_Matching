@@ -3,8 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/shrine.dart';
 import '../models/question.dart';
 import '../models/app_user.dart';
-import '../models/kami.dart';     // ★変更：kami.dart
-import '../models/history.dart';  // ★変更：history.dart
+import '../models/kami.dart'; // ★変更：kami.dart
+import '../models/history.dart'; // ★変更：history.dart
 import '../models/type_info.dart';
 import '../models/crossing.dart';
 
@@ -105,14 +105,29 @@ class FirestoreService {
   Future<List<Shrine>> getFavoriteShrines(List<String> favoriteIds) async {
     if (favoriteIds.isEmpty) return [];
 
-    final snapshot = await _db
-        .collection('Shrines')
-        .where(FieldPath.documentId, whereIn: favoriteIds)
-        .get();
+    // Firestore whereIn has a max item limit, so split into small chunks.
+    const int whereInLimit = 10;
+    final ids = favoriteIds.where((id) => id.trim().isNotEmpty).toList();
+    final shrineById = <String, Shrine>{};
 
-    return snapshot.docs
-        .map((doc) => Shrine.fromFirestore(doc.data(), doc.id))
-        .toList();
+    for (int i = 0; i < ids.length; i += whereInLimit) {
+      final end = (i + whereInLimit) > ids.length
+          ? ids.length
+          : i + whereInLimit;
+      final chunk = ids.sublist(i, end);
+
+      final snapshot = await _db
+          .collection('Shrines')
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+
+      for (final doc in snapshot.docs) {
+        shrineById[doc.id] = Shrine.fromFirestore(doc.data(), doc.id);
+      }
+    }
+
+    // Keep the same order as favorite IDs and skip deleted shrine docs.
+    return ids.map((id) => shrineById[id]).whereType<Shrine>().toList();
   }
 
   // ==========================================
@@ -124,7 +139,18 @@ class FirestoreService {
     return List<String>.from(userDoc.data()?['favoriteShrineIds'] ?? []);
   }
 
- // ==========================================
+  // ==========================================
+  // ⑤-3 現在ログイン中ユーザーの「縁を結んだ神社」を取得する関数
+  // ==========================================
+  Future<List<Shrine>> getMatchedShrinesForCurrentUser() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return [];
+
+    final favoriteIds = await getFavoriteShrineIds(uid);
+    return getFavoriteShrines(favoriteIds);
+  }
+
+  // ==========================================
   // ⑥ 神社一覧と、それぞれの神様（サブコレクション）をまとめて取得する関数
   // ==========================================
   Future<List<Shrine>> getShrinesWithKami() async {
@@ -163,9 +189,7 @@ class FirestoreService {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    await userRef.update({
-      'lastType': resultType,
-    });
+    await userRef.update({'lastType': resultType});
   }
 
   // ==========================================
@@ -304,5 +328,43 @@ class FirestoreService {
   // ==========================================
   Future<void> updateCoverUrl(String userId, String url) async {
     await _db.collection('Users').doc(userId).update({'coverUrl': url});
+  }
+
+  // ==========================================
+  // ⑰ ユーザーの参拝件数を取得する関数
+  // ==========================================
+  Future<int> getVisitsCount(String userId) async {
+    final snapshot = await _db
+        .collection('Users')
+        .doc(userId)
+        .collection('Visits')
+        .get();
+    return snapshot.size;
+  }
+
+  // ==========================================
+  // ⑱ ユーザーのすれ違い件数を取得する関数
+  // ==========================================
+  Future<int> getCrossingsCount(String userId) async {
+    final snapshot = await _db
+        .collection('Users')
+        .doc(userId)
+        .collection('Crossings')
+        .get();
+    return snapshot.size;
+  }
+
+  // ==========================================
+  // ⑲ ランダムな神社一覧を取得する関数
+  // ==========================================
+  Future<List<Shrine>> getRandomShrines({int limit = 5}) async {
+    final shrines = await getShrines();
+    shrines.shuffle();
+
+    if (shrines.length <= limit) {
+      return shrines;
+    }
+
+    return shrines.take(limit).toList();
   }
 }

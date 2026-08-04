@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shrine_matching/models/shrine.dart';
 import 'package:shrine_matching/pages/matching.dart';
+import 'package:shrine_matching/pages/shrineInfo.dart';
 import 'package:shrine_matching/services/firestore_service.dart';
 import 'package:shrine_matching/services/app_globals.dart';
 import 'package:shrine_matching/models/crossing.dart';
+import 'package:shrine_matching/widgets/root_tab_selection.dart';
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
@@ -18,11 +21,28 @@ class HomePageWidget extends StatefulWidget {
 class HomePageWidgetState extends State<HomePageWidget> {
   final scaffoldKey = GlobalKey<ScaffoldState>();
   final FirestoreService _firestoreService = FirestoreService();
+  List<_ShrineCardData> _matchedShrines = const <_ShrineCardData>[];
 
   @override
   void initState() {
     super.initState();
+    RootTabSelection.request.addListener(_handleRootTabSelectionRequested);
     refreshCrossings();
+    _loadMatchedShrines();
+  }
+
+  @override
+  void dispose() {
+    RootTabSelection.request.removeListener(_handleRootTabSelectionRequested);
+    super.dispose();
+  }
+
+  void _handleRootTabSelectionRequested() {
+    final request = RootTabSelection.request.value;
+    if (request == null || request.index != RootTabSelection.home) {
+      return;
+    }
+    _loadMatchedShrines();
   }
 
   // Homeタブに切り替えられるたびに、外部（RootTabsPage）から呼び出せるようにpublicにしてある
@@ -80,52 +100,126 @@ class HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
-  final List<_ShrineCardData> _matchedShrines = const [
-    _ShrineCardData(
-      imageUrl: 'https://picsum.photos/seed/matched_1/700/900',
-      name: '〇〇神社',
-      location: '京都市〇〇区',
-    ),
-    _ShrineCardData(
-      imageUrl: 'https://picsum.photos/seed/matched_2/700/900',
-      name: '〇〇神社',
-      location: '京都市〇〇区',
-    ),
-  ];
+  Future<void> _loadMatchedShrines() async {
+    try {
+      final shrines = await _firestoreService.getMatchedShrinesForCurrentUser();
+      if (!mounted) return;
 
-  final List<_ShrineCardData> _recentShrines = const [
+      setState(() {
+        _matchedShrines = shrines
+            .map(
+              (shrine) => _ShrineCardData(
+                imageUrl: shrine.images.isNotEmpty
+                    ? shrine.images.first
+                    : 'https://picsum.photos/seed/${shrine.id}/700/900',
+                name: shrine.name,
+                location: shrine.address.isNotEmpty ? shrine.address : '住所情報なし',
+                shrineId: shrine.id,
+                initialShrine: shrine,
+              ),
+            )
+            .toList();
+      });
+    } catch (e, stack) {
+      debugPrint('縁を結んだ神社の読み込みに失敗しました: $e\n$stack');
+    }
+  }
+
+  static Shrine _placeholderShrine({
+    required String id,
+    required String name,
+    required String imageUrl,
+    required String address,
+  }) {
+    return Shrine(
+      id: id,
+      name: name,
+      images: <String>[imageUrl],
+      concept: 'この神社の詳細情報は準備中です。',
+      description: 'この神社の説明は準備中です。',
+      tags: const <String>[],
+      latitude: 0,
+      longitude: 0,
+      address: address,
+      favoriteCount: 0,
+    );
+  }
+
+  final List<_ShrineCardData> _recentShrines = [
     _ShrineCardData(
       imageUrl: 'https://picsum.photos/seed/recent_1/500/500',
       name: '〇〇神社',
       location: '京都市〇〇区',
+      shrineId: 'home_recent_1',
+      initialShrine: _placeholderShrine(
+        id: 'home_recent_1',
+        name: '〇〇神社',
+        imageUrl: 'https://picsum.photos/seed/recent_1/500/500',
+        address: '京都市〇〇区',
+      ),
     ),
     _ShrineCardData(
       imageUrl: 'https://picsum.photos/seed/recent_2/500/500',
       name: '〇〇神社',
       location: '京都市〇〇区',
+      shrineId: 'home_recent_2',
+      initialShrine: _placeholderShrine(
+        id: 'home_recent_2',
+        name: '〇〇神社',
+        imageUrl: 'https://picsum.photos/seed/recent_2/500/500',
+        address: '京都市〇〇区',
+      ),
     ),
     _ShrineCardData(
       imageUrl: 'https://picsum.photos/seed/recent_3/500/500',
       name: '〇〇神社',
       location: '京都市〇〇区',
+      shrineId: 'home_recent_3',
+      initialShrine: _placeholderShrine(
+        id: 'home_recent_3',
+        name: '〇〇神社',
+        imageUrl: 'https://picsum.photos/seed/recent_3/500/500',
+        address: '京都市〇〇区',
+      ),
     ),
   ];
 
-  final List<_ShrineCardData> _sameTypeShrines = const [
+  final List<_ShrineCardData> _sameTypeShrines = [
     _ShrineCardData(
       imageUrl: 'https://picsum.photos/seed/type_1/500/500',
       name: '〇〇神社',
       location: '京都市〇〇区',
+      shrineId: 'home_same_type_1',
+      initialShrine: _placeholderShrine(
+        id: 'home_same_type_1',
+        name: '〇〇神社',
+        imageUrl: 'https://picsum.photos/seed/type_1/500/500',
+        address: '京都市〇〇区',
+      ),
     ),
     _ShrineCardData(
       imageUrl: 'https://picsum.photos/seed/type_2/500/500',
       name: '〇〇神社',
       location: '京都市〇〇区',
+      shrineId: 'home_same_type_2',
+      initialShrine: _placeholderShrine(
+        id: 'home_same_type_2',
+        name: '〇〇神社',
+        imageUrl: 'https://picsum.photos/seed/type_2/500/500',
+        address: '京都市〇〇区',
+      ),
     ),
     _ShrineCardData(
       imageUrl: 'https://picsum.photos/seed/type_3/500/500',
       name: '〇〇神社',
       location: '京都市〇〇区',
+      shrineId: 'home_same_type_3',
+      initialShrine: _placeholderShrine(
+        id: 'home_same_type_3',
+        name: '〇〇神社',
+        imageUrl: 'https://picsum.photos/seed/type_3/500/500',
+        address: '京都市〇〇区',
+      ),
     ),
   ];
 
@@ -247,47 +341,60 @@ class _ShrineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            data.imageUrl,
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ShrineInfoPage(
+              shrineId: data.shrineId,
+              initialShrine: data.initialShrine,
+            ),
+          ),
+        );
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              data.imageUrl,
+              width: imageWidth,
+              height: imageHeight,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
             width: imageWidth,
-            height: imageHeight,
-            fit: BoxFit.cover,
-          ),
-        ),
-        const SizedBox(height: 6),
-        SizedBox(
-          width: imageWidth,
-          child: Text(
-            data.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.zenOldMincho(
-              fontSize: 16,
-              fontWeight: FontWeight.w400,
-              color: const Color(0xFF6D666B),
+            child: Text(
+              data.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.zenOldMincho(
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+                color: const Color(0xFF6D666B),
+              ),
             ),
           ),
-        ),
-        SizedBox(
-          width: imageWidth,
-          child: Text(
-            data.location,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.zenOldMincho(
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-              color: const Color(0xFFA9A2A7),
+          SizedBox(
+            width: imageWidth,
+            child: Text(
+              data.location,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.zenOldMincho(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                color: const Color(0xFFA9A2A7),
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -297,11 +404,15 @@ class _ShrineCardData {
     required this.imageUrl,
     required this.name,
     required this.location,
+    required this.shrineId,
+    this.initialShrine,
   });
 
   final String imageUrl;
   final String name;
   final String location;
+  final String shrineId;
+  final Shrine? initialShrine;
 }
 
 class _CrossingCard extends StatelessWidget {
@@ -338,7 +449,10 @@ class _CrossingCard extends StatelessWidget {
                 children: [
                   Text(
                     crossing.shrineName,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   if (crossing.tags.isNotEmpty)
@@ -346,12 +460,17 @@ class _CrossingCard extends StatelessWidget {
                       spacing: 6,
                       runSpacing: 6,
                       children: crossing.tags
-                          .map((tag) => Chip(
-                                label: Text(tag, style: const TextStyle(fontSize: 12)),
-                                padding: EdgeInsets.zero,
-                                visualDensity: VisualDensity.compact,
-                                backgroundColor: const Color(0xFFFFF3EC),
-                              ))
+                          .map(
+                            (tag) => Chip(
+                              label: Text(
+                                tag,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              padding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                              backgroundColor: const Color(0xFFFFF3EC),
+                            ),
+                          )
                           .toList(),
                     ),
                   const SizedBox(height: 8),
@@ -363,7 +482,10 @@ class _CrossingCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             crossing.address,
-                            style: const TextStyle(fontSize: 13, color: Colors.grey),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey,
+                            ),
                           ),
                         ),
                       ],
@@ -371,11 +493,18 @@ class _CrossingCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                      const Icon(
+                        Icons.access_time,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '${_formatDateTime(crossing.crossedAt)} にすれ違いました',
-                        style: const TextStyle(fontSize: 13, color: Colors.grey),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey,
+                        ),
                       ),
                     ],
                   ),
@@ -394,7 +523,8 @@ class _CrossingCard extends StatelessWidget {
                         Navigator.of(context).pop(); // パネルを閉じる
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => MatchingPage(shrineIds: allShrineIds),
+                            builder: (_) =>
+                                MatchingPage(shrineIds: allShrineIds),
                           ),
                         );
                       },

@@ -85,12 +85,18 @@ class RootTabsPage extends StatefulWidget {
 class _RootTabsPageState extends State<RootTabsPage>
     with WidgetsBindingObserver {
   static const Color _selectedColor = Color(0xFFDB4713);
-  static const Color _unselectedColor = Color(0xFF7F7F7F);
   static const double _tabItemWidth = 50;
   static const double _tabItemGap = 6;
   static const double _barHorizontalPadding = 12;
   static const double _barVerticalPadding = 9;
   final BottomBarController _bottomBarController = BottomBarController();
+
+  static const List<String?> _tabAssetIcons = [
+    'lib/assets/torii.png',
+    'lib/assets/maps.png',
+    'lib/assets/loading_ribbon.png',
+    null,
+  ];
 
   static const List<IconData> _tabIcons = [
     CupertinoIcons.house_fill,
@@ -159,6 +165,16 @@ class _RootTabsPageState extends State<RootTabsPage>
         _currentIndex = requestedIndex;
       });
     }
+
+    if (RootBottomBarVisibility.isVisible.value) {
+      _bottomBarController.show();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !RootBottomBarVisibility.isVisible.value) {
+          return;
+        }
+        _bottomBarController.show();
+      });
+    }
   }
 
   @override
@@ -206,13 +222,29 @@ class _RootTabsPageState extends State<RootTabsPage>
   }
 
   void _onTabPressed(int index) {
-    _navigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
+    RootTabSelection.select(index);
+  }
 
-    if (index != _currentIndex) {
-      setState(() {
-        _currentIndex = index;
-      });
+  Widget _buildTabIcon(int index, bool isSelected) {
+    final assetPath = _tabAssetIcons[index];
+    final double size = isSelected ? 24 : 22;
+
+    if (assetPath != null) {
+      return Opacity(
+        opacity: isSelected ? 1 : 0.62,
+        child: Image.asset(
+          assetPath,
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+        ),
+      );
     }
+
+    return Opacity(
+      opacity: isSelected ? 1 : 0.62,
+      child: Icon(_tabIcons[index], size: size, color: _selectedColor),
+    );
   }
 
   Widget _tabRootPage(int index) {
@@ -356,11 +388,7 @@ class _RootTabsPageState extends State<RootTabsPage>
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: Icon(
-                        _tabIcons[index],
-                        size: isSelected ? 24 : 22,
-                        color: isSelected ? _selectedColor : _unselectedColor,
-                      ),
+                      child: _buildTabIcon(index, isSelected),
                     ),
                   ),
                 ),

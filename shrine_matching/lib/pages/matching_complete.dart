@@ -182,7 +182,7 @@ class _ConnectionVisual extends StatelessWidget {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _ShrineCluster(imageUrl: shrineImageUrl),
+              _ShrineCircle(imageUrl: shrineImageUrl),
               const SizedBox(height: 6),
               Text(
                 '神社',
@@ -234,46 +234,34 @@ class _ProfileCircle extends StatelessWidget {
   }
 }
 
-class _ShrineCluster extends StatelessWidget {
-  const _ShrineCluster({required this.imageUrl});
+class _ShrineCircle extends StatelessWidget {
+  const _ShrineCircle({required this.imageUrl});
 
   final String imageUrl;
 
   @override
   Widget build(BuildContext context) {
-    Widget circle(double size) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: const BoxDecoration(shape: BoxShape.circle),
-        clipBehavior: Clip.antiAlias,
-        child: Image.network(
-          imageUrl,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              color: const Color(0xFFE8E8E8),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.broken_image_outlined,
-                color: Colors.black45,
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    return SizedBox(
-      width: 102,
-      height: 86,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(left: 0, top: 20, child: circle(52)),
-          Positioned(right: 0, top: 0, child: circle(52)),
-          Positioned(right: 12, bottom: 0, child: circle(52)),
-        ],
+    return Container(
+      width: 90,
+      height: 90,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFC9C5CA)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: const Color(0xFFE8E8E8),
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.broken_image_outlined,
+              color: Colors.black45,
+            ),
+          );
+        },
       ),
     );
   }
