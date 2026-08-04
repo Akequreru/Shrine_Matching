@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:shrine_matching/services/crossing_task_handler.dart';
 import 'package:shrine_matching/services/firestore_service.dart';
@@ -33,12 +34,15 @@ class _MapPageState extends State<MapPage> {
 
   final FirestoreService _firestoreService = FirestoreService();
   List<Shrine> _shrines = [];
+  Set<String> _favoriteShrineIds = {};
+  bool _showOnlyFavorites = false;
 
   @override
   void initState() {
     super.initState();
     _determinePosition();
     _loadShrines();
+    _loadFavorites();
   }
 
   Future<void> _loadShrines() async {
@@ -46,6 +50,16 @@ class _MapPageState extends State<MapPage> {
     if (!mounted) return;
     setState(() {
       _shrines = shrines;
+    });
+  }
+
+  Future<void> _loadFavorites() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    final ids = await _firestoreService.getFavoriteShrineIds(uid);
+    if (!mounted) return;
+    setState(() {
+      _favoriteShrineIds = ids.toSet();
     });
   }
 
@@ -238,6 +252,22 @@ class _MapPageState extends State<MapPage> {
         title: const Text('Map'),
         actions: [
           IconButton(
+            onPressed: () {
+              if (!_showOnlyFavorites) {
+                // お気に入りだけ表示するモードに入る直前に最新化しておく
+                _loadFavorites();
+              }
+              setState(() {
+                _showOnlyFavorites = !_showOnlyFavorites;
+              });
+            },
+            icon: Icon(
+              _showOnlyFavorites ? Icons.star : Icons.star_border,
+              color: Colors.amber,
+            ),
+            tooltip: _showOnlyFavorites ? 'すべての神社を表示' : 'お気に入りのみ表示',
+          ),
+          IconButton(
             onPressed: _toggleCrossingService,
             icon: Icon(
               _isCrossingServiceRunning
@@ -262,16 +292,20 @@ class _MapPageState extends State<MapPage> {
             userAgentPackageName: 'com.example.shrine_matching',
           ),
           MarkerLayer(
-            markers: _shrines.map((shrine) {
+            markers: _shrines
+                .where((shrine) =>
+                    !_showOnlyFavorites || _favoriteShrineIds.contains(shrine.id))
+                .map((shrine) {
+              final isFavorite = _favoriteShrineIds.contains(shrine.id);
               return Marker(
                 point: LatLng(shrine.latitude, shrine.longitude),
                 width: 36,
                 height: 36,
                 child: GestureDetector(
                   onTap: () => _showShrineSheet(shrine),
-                  child: const Icon(
+                  child: Icon(
                     Icons.location_on,
-                    color: Color(0xFFDB4713),
+                    color: isFavorite ? const Color(0xFFDB4713) : Colors.blue,
                     size: 36,
                   ),
                 ),

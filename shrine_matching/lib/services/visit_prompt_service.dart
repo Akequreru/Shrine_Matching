@@ -163,66 +163,77 @@ class _VisitPromptDialogState extends State<VisitPromptDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              widget.shrine.name,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (widget.shrine.images.isNotEmpty)
+            AspectRatio(
+              aspectRatio: 16 / 10,
+              child: Image.network(widget.shrine.images.first, fit: BoxFit.cover),
             ),
-            const SizedBox(height: 8),
-            const Text('近くにいるようです。参拝しましたか？', textAlign: TextAlign.center),
-            const SizedBox(height: 20),
-            if (_isDone)
-              const Text('参拝を記録しました', style: TextStyle(color: Colors.green))
-            else ...[
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFDB4713),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(50),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.shrine.name,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text('近くにいるようです。参拝しましたか？', textAlign: TextAlign.center),
+                const SizedBox(height: 20),
+                if (_isDone)
+                  const Text('参拝を記録しました', style: TextStyle(color: Colors.green))
+                else ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFDB4713),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(50),
+                        ),
+                      ),
+                      onPressed: _isSubmitting
+                          ? null
+                          : () async {
+                              setState(() => _isSubmitting = true);
+                              await widget.firestoreService.recordVisit(widget.shrine);
+                              if (!mounted) return;
+                              setState(() {
+                                _isSubmitting = false;
+                                _isDone = true;
+                              });
+                            },
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('参拝する'),
                     ),
                   ),
-                  onPressed: _isSubmitting
-                      ? null
-                      : () async {
-                          setState(() => _isSubmitting = true);
-                          await widget.firestoreService.recordVisit(widget.shrine);
-                          if (!mounted) return;
-                          setState(() {
-                            _isSubmitting = false;
-                            _isDone = true;
-                          });
-                        },
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('参拝する'),
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-                  child: const Text('参拝しない'),
-                ),
-              ),
-            ],
-          ],
-        ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+                      child: const Text('参拝しない'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

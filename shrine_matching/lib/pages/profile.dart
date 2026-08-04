@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shrine_matching/models/shrine.dart';
 import 'package:shrine_matching/pages/diagnote.dart';
 import 'package:shrine_matching/pages/shrineInfo.dart';
@@ -27,9 +29,15 @@ class ProfilePageWidget extends StatefulWidget {
 
 class _ProfilePageWidgetState extends State<ProfilePageWidget> {
   final FirestoreService _firestoreService = FirestoreService();
+  final ImagePicker _imagePicker = ImagePicker();
 
   bool _isLoadingFavorites = true;
   List<Shrine> _favoriteShrines = <Shrine>[];
+
+  String _avatarUrl = '';
+  String _coverUrl = '';
+  bool _isUploadingAvatar = false;
+  bool _isUploadingCover = false;
 
   @override
   void initState() {
@@ -52,8 +60,68 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget> {
     if (!mounted) return;
     setState(() {
       _favoriteShrines = shrines;
+      _avatarUrl = user?.avatarUrl ?? '';
+      _coverUrl = user?.coverUrl ?? '';
       _isLoadingFavorites = false;
     });
+  }
+
+  Future<void> _pickAndUploadImage({required bool isAvatar}) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final picked = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    setState(() {
+      if (isAvatar) {
+        _isUploadingAvatar = true;
+      } else {
+        _isUploadingCover = true;
+      }
+    });
+
+    try {
+      final fileName = isAvatar ? 'avatar.jpg' : 'cover.jpg';
+      final ref = FirebaseStorage.instance.ref('Users/$uid/$fileName');
+      await ref.putData(await picked.readAsBytes());
+      final url = await ref.getDownloadURL();
+
+      if (isAvatar) {
+        await _firestoreService.updateAvatarUrl(uid, url);
+      } else {
+        await _firestoreService.updateCoverUrl(uid, url);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        if (isAvatar) {
+          _avatarUrl = url;
+        } else {
+          _coverUrl = url;
+        }
+      });
+    } catch (e) {
+      debugPrint('画像のアップロードに失敗しました: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('画像のアップロードに失敗しました')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          if (isAvatar) {
+            _isUploadingAvatar = false;
+          } else {
+            _isUploadingCover = false;
+          }
+        });
+      }
+    }
   }
 
   @override
@@ -87,26 +155,96 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget> {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              Image.network(
-                'https://picsum.photos/seed/836/900/320',
-                width: double.infinity,
-                height: headerHeight,
-                fit: BoxFit.cover,
+              GestureDetector(
+                onTap: _isUploadingCover
+                    ? null
+                    : () => _pickAndUploadImage(isAvatar: false),
+                child: Stack(
+                  children: [
+                    Image.network(
+                      _coverUrl.isNotEmpty
+                          ? _coverUrl
+                          : 'https://picsum.photos/seed/836/900/320',
+                      width: double.infinity,
+                      height: headerHeight,
+                      fit: BoxFit.cover,
+                    ),
+                    if (_isUploadingCover)
+                      Container(
+                        width: double.infinity,
+                        height: headerHeight,
+                        color: Colors.black26,
+                        child: const Center(
+                          child: CircularProgressIndicator(color: Colors.white),
+                        ),
+                      )
+                    else
+                      Positioned(
+                        right: 8,
+                        bottom: 8,
+                        child: Material(
+                          color: const Color(0x818D8D8D),
+                          shape: const CircleBorder(),
+                          child: const Padding(
+                            padding: EdgeInsets.all(6),
+                            child: Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
               Positioned(
                 left: 20,
                 top: avatarTop,
-                child: Container(
-                  width: avatarSize,
-                  height: avatarSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Image.network(
-                    'https://picsum.photos/seed/796/300',
-                    fit: BoxFit.cover,
+                child: GestureDetector(
+                  onTap: _isUploadingAvatar
+                      ? null
+                      : () => _pickAndUploadImage(isAvatar: true),
+                  child: Container(
+                    width: avatarSize,
+                    height: avatarSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Stack(
+                      children: [
+                        Image.network(
+                          _avatarUrl.isNotEmpty
+                              ? _avatarUrl
+                              : 'https://picsum.photos/seed/796/300',
+                          width: avatarSize,
+                          height: avatarSize,
+                          fit: BoxFit.cover,
+                        ),
+                        if (_isUploadingAvatar)
+                          Container(
+                            width: avatarSize,
+                            height: avatarSize,
+                            color: Colors.black26,
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                          )
+                        else
+                          const Align(
+                            alignment: Alignment.bottomRight,
+                            child: Padding(
+                              padding: EdgeInsets.all(4),
+                              child: CircleAvatar(
+                                radius: 12,
+                                backgroundColor: Color(0x818D8D8D),
+                                child: Icon(Icons.camera_alt, color: Colors.white, size: 14),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),

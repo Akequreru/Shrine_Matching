@@ -115,6 +115,15 @@ class FirestoreService {
         .toList();
   }
 
+  // ==========================================
+  // ⑤-2 ユーザーがお気に入りした神社のID一覧だけを取得する軽量版
+  // ==========================================
+  Future<List<String>> getFavoriteShrineIds(String userId) async {
+    final userDoc = await _db.collection('Users').doc(userId).get();
+    if (!userDoc.exists) return [];
+    return List<String>.from(userDoc.data()?['favoriteShrineIds'] ?? []);
+  }
+
  // ==========================================
   // ⑥ 神社一覧と、それぞれの神様（サブコレクション）をまとめて取得する関数
   // ==========================================
@@ -281,5 +290,19 @@ class FirestoreService {
         .collection('PendingVisitSuppressions')
         .doc(shrine.id)
         .set({'markedAt': FieldValue.serverTimestamp()});
+  }
+
+  // ==========================================
+  // ⑮ プロフィールのアイコン画像URLを更新する関数
+  // ==========================================
+  Future<void> updateAvatarUrl(String userId, String url) async {
+    await _db.collection('Users').doc(userId).update({'avatarUrl': url});
+  }
+
+  // ==========================================
+  // ⑯ プロフィールの背景画像URLを更新する関数
+  // ==========================================
+  Future<void> updateCoverUrl(String userId, String url) async {
+    await _db.collection('Users').doc(userId).update({'coverUrl': url});
   }
 }
