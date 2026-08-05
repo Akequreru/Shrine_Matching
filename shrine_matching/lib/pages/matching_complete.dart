@@ -31,16 +31,25 @@ class _MatchCompletePageState extends State<MatchCompletePage> {
     super.dispose();
   }
 
-  void _openBookmarkPage() {
+  void _goToRootTabWithRefresh(int tabIndex) {
     RootBottomBarVisibility.show();
-    RootTabSelection.select(RootTabSelection.bookmark);
+    RootTabSelection.select(tabIndex);
     Navigator.of(context).popUntil((route) => route.isFirst);
+
+    // Re-request after the route pop animation so visibility recovery does not
+    // depend on scroll events from the destination page.
+    Future<void>.delayed(const Duration(milliseconds: 220), () {
+      RootBottomBarVisibility.show();
+      RootTabSelection.select(tabIndex);
+    });
+  }
+
+  void _openBookmarkPage() {
+    _goToRootTabWithRefresh(RootTabSelection.bookmark);
   }
 
   void _closeToHomePage() {
-    RootBottomBarVisibility.show();
-    RootTabSelection.select(RootTabSelection.home);
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    _goToRootTabWithRefresh(RootTabSelection.home);
   }
 
   @override
@@ -96,7 +105,7 @@ class _MatchCompletePageState extends State<MatchCompletePage> {
                             ),
                           ),
                           onPressed: _openBookmarkPage,
-                          child: const Text('神社の場所を見てみる'),
+                          child: const Text('神社を見る'),
                         ),
                       ),
                     ),
