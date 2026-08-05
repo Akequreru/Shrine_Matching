@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shrine_matching/pages/diagnote.dart';
-import 'package:shrine_matching/models/shrine.dart';
+import 'package:shrine_matching/models/visit.dart';
 import 'package:shrine_matching/pages/profile_settings.dart';
 import 'package:shrine_matching/pages/shrineInfo.dart';
 import 'package:shrine_matching/services/firestore_service.dart';
@@ -38,7 +38,7 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget>
 
   bool _isLoadingPage = true;
   bool _isLoadingProfileData = false;
-  List<Shrine> _historyShrines = <Shrine>[];
+  List<Visit> _historyVisits = <Visit>[];
 
   String _displayName = 'ユーザーネーム';
   String _typeLabel = '○○タイプ';
@@ -120,8 +120,7 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget>
 
     try {
       final userFuture = _firestoreService.getUserWithHistory(uid);
-      final matchedShrinesFuture = _firestoreService
-          .getMatchedShrinesForCurrentUser();
+      final visitsFuture = _firestoreService.getVisits();
       final visitCountFuture = _firestoreService.getVisitsCount(uid);
       final crossingCountFuture = _firestoreService.getCrossingsCount(uid);
 
@@ -136,7 +135,7 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget>
         }
       }
 
-      final matchedShrines = await matchedShrinesFuture;
+      final visits = await visitsFuture;
       final visitCount = await visitCountFuture;
       final crossingCount = await crossingCountFuture;
 
@@ -150,7 +149,7 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget>
         _matchedShrineCount = user?.favoriteShrineIds.length ?? 0;
         _crossedShrineCount = crossingCount;
         _visitedShrineCount = visitCount;
-        _historyShrines = matchedShrines;
+        _historyVisits = visits;
         _isLoadingPage = false;
       });
     } catch (e) {
@@ -208,11 +207,6 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget>
     final month = date.month.toString().padLeft(2, '0');
     final day = date.day.toString().padLeft(2, '0');
     return '${date.year}/$month/$day';
-  }
-
-  String _historyDateForIndex(int index) {
-    final date = DateTime.now().subtract(Duration(days: index * 2));
-    return _formatDate(date);
   }
 
   @override
@@ -477,11 +471,11 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget>
                   ),
                 ),
               )
-            else if (_historyShrines.isEmpty)
+            else if (_historyVisits.isEmpty)
               Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: Text(
-                  '履歴に表示する神社データがありません',
+                  'まだ参拝した神社がありません',
                   style: GoogleFonts.zenOldMincho(
                     color: Colors.black54,
                     fontSize: 14,
@@ -489,22 +483,20 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget>
                 ),
               )
             else
-              ...List.generate(_historyShrines.length, (index) {
-                final shrine = _historyShrines[index];
+              ...List.generate(_historyVisits.length, (index) {
+                final visit = _historyVisits[index];
                 return Padding(
                   padding: EdgeInsets.only(
-                    bottom: index == _historyShrines.length - 1 ? 0 : 12,
+                    bottom: index == _historyVisits.length - 1 ? 0 : 12,
                   ),
                   child: _HistoryCard(
-                    shrine: shrine,
-                    visitedDate: _historyDateForIndex(index),
+                    visit: visit,
+                    visitedDate: _formatDate(visit.visitedAt),
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => ShrineInfoPage(
-                            shrineId: shrine.id,
-                            initialShrine: shrine,
-                          ),
+                          builder: (_) =>
+                              ShrineInfoPage(shrineId: visit.shrineId),
                         ),
                       );
                     },
@@ -588,20 +580,20 @@ class _StatusBadge extends StatelessWidget {
 
 class _HistoryCard extends StatelessWidget {
   const _HistoryCard({
-    required this.shrine,
+    required this.visit,
     required this.visitedDate,
     required this.onTap,
   });
 
-  final Shrine shrine;
+  final Visit visit;
   final String visitedDate;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = shrine.images.isNotEmpty
-        ? shrine.images.first
-        : 'https://picsum.photos/seed/${shrine.id}/220';
+    final imageUrl = visit.image.isNotEmpty
+        ? visit.image
+        : 'https://picsum.photos/seed/${visit.shrineId}/220';
 
     return Material(
       color: Colors.white,
@@ -638,7 +630,9 @@ class _HistoryCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      shrine.name.isNotEmpty ? shrine.name : '名称未設定の神社',
+                      visit.shrineName.isNotEmpty
+                          ? visit.shrineName
+                          : '名称未設定の神社',
                       style: GoogleFonts.zenOldMincho(
                         fontSize: 17,
                         fontWeight: FontWeight.w600,

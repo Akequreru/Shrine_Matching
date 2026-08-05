@@ -7,6 +7,7 @@ import '../models/kami.dart'; // ★変更：kami.dart
 import '../models/history.dart'; // ★変更：history.dart
 import '../models/type_info.dart';
 import '../models/crossing.dart';
+import '../models/visit.dart';
 
 class FirestoreService {
   // Firestoreのインスタンス（通信窓口）を変数にしておく
@@ -372,6 +373,28 @@ class FirestoreService {
         .collection('Visits')
         .get();
     return snapshot.size;
+  }
+
+  // ==========================================
+  // ⑰-2 現在ログイン中ユーザーの「参拝履歴」を新しい順に取得する関数
+  // ==========================================
+  Future<List<Visit>> getVisits({int? limit}) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return [];
+
+    Query<Map<String, dynamic>> query = _db
+        .collection('Users')
+        .doc(uid)
+        .collection('Visits')
+        .orderBy('visitedAt', descending: true);
+    if (limit != null) {
+      query = query.limit(limit);
+    }
+
+    final snapshot = await query.get();
+    return snapshot.docs
+        .map((doc) => Visit.fromFirestore(doc.data(), doc.id))
+        .toList();
   }
 
   // ==========================================
