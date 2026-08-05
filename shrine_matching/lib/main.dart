@@ -102,7 +102,7 @@ class _RootTabsPageState extends State<RootTabsPage>
   static const List<String?> _tabAssetIcons = [
     'lib/assets/torii.png',
     'lib/assets/maps.png',
-    'lib/assets/loading_ribbon.png',
+    'lib/assets/ribbon.png',
     null,
   ];
 

@@ -113,22 +113,34 @@ class _BookmarkPageWidgetState extends State<BookmarkPageWidget> {
                             Text(
                               _errorMessage!,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(color: Colors.black54),
+                              style: GoogleFonts.zenOldMincho(
+                                fontSize: 14,
+                                color: Colors.black54,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             ElevatedButton(
                               onPressed: _loadMatchedShrines,
-                              child: const Text('再読み込み'),
+                              child: Text(
+                                '再読み込み',
+                                style: GoogleFonts.zenOldMincho(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
                           ],
                         ),
                       ),
                     )
                   : _shrines.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         'まだ縁を結んだ神社がありません',
-                        style: TextStyle(color: Colors.black54),
+                        style: GoogleFonts.zenOldMincho(
+                          fontSize: 14,
+                          color: Colors.black54,
+                        ),
                       ),
                     )
                   : ListView.separated(
@@ -179,17 +191,19 @@ class _BookmarkPageWidgetState extends State<BookmarkPageWidget> {
                                     children: [
                                       Text(
                                         shrine.name,
-                                        style: const TextStyle(
+                                        style: GoogleFonts.zenOldMincho(
                                           fontSize: 17,
-                                          fontWeight: FontWeight.w700,
+                                          fontWeight: FontWeight.w600,
+                                          color: const Color(0xFF2D2D2D),
                                         ),
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
                                         shrine.concept,
-                                        style: const TextStyle(
-                                          color: Colors.black87,
-                                          height: 1.3,
+                                        style: GoogleFonts.zenOldMincho(
+                                          fontSize: 14,
+                                          color: const Color(0xFF6D666B),
+                                          height: 1.35,
                                         ),
                                       ),
                                     ],
