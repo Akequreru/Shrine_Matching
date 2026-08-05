@@ -120,6 +120,43 @@ class _RootTabsPageState extends State<RootTabsPage>
 
   Timer? _scrollIdleTimer;
   int _currentIndex = 0;
+  int _barShowRequestId = 0;
+
+  void _ensureBottomBarVisibleAfterTabChange({bool forceVisible = false}) {
+    if (!mounted) {
+      return;
+    }
+
+    if (forceVisible) {
+      RootBottomBarVisibility.show();
+    }
+
+    final int requestId = ++_barShowRequestId;
+
+    void showIfStillRelevant() {
+      if (!mounted || requestId != _barShowRequestId) {
+        return;
+      }
+      if (!RootBottomBarVisibility.isVisible.value) {
+        return;
+      }
+      _bottomBarController.show();
+    }
+
+    showIfStillRelevant();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showIfStillRelevant();
+    });
+
+    // Route pops and tab/body swaps can emit late scroll updates that briefly
+    // re-hide the bar. Retry a few times across the transition window.
+    for (final int delayMs in <int>[120, 260, 420, 680, 960]) {
+      Future<void>.delayed(Duration(milliseconds: delayMs), () {
+        showIfStillRelevant();
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -143,7 +180,7 @@ class _RootTabsPageState extends State<RootTabsPage>
       return;
     }
     if (RootBottomBarVisibility.isVisible.value) {
-      _bottomBarController.show();
+      _ensureBottomBarVisibleAfterTabChange(forceVisible: false);
     } else {
       _bottomBarController.hide();
     }
@@ -174,15 +211,7 @@ class _RootTabsPageState extends State<RootTabsPage>
       });
     }
 
-    if (RootBottomBarVisibility.isVisible.value) {
-      _bottomBarController.show();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !RootBottomBarVisibility.isVisible.value) {
-          return;
-        }
-        _bottomBarController.show();
-      });
-    }
+    _ensureBottomBarVisibleAfterTabChange(forceVisible: true);
   }
 
   @override
