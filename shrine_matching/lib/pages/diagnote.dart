@@ -204,55 +204,57 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    "Q${index + 1}.",
-                    style: GoogleFonts.castoro(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w400,
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            "Q${index + 1}.",
+                            style: GoogleFonts.castoro(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Align(
+                          alignment: Alignment.topLeft,
+                          child: Text(
+                            _formatQuestionText(question.text),
+                            style: GoogleFonts.zenOldMincho(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w500,
+                              height: 1.4,
+                            ),
+                            textAlign: TextAlign.left,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+
+                        // 選択肢A (+1)
+                        _buildChoiceButton(
+                          context: context,
+                          text: question.choiceA,
+                          isSelected: answer == 1,
+                          onPressed: () => _handleAnswer(1),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // 選択肢B (-1)
+                        _buildChoiceButton(
+                          context: context,
+                          text: question.choiceB,
+                          isSelected: answer == -1,
+                          onPressed: () => _handleAnswer(-1),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-
-                SizedBox(
-                  height: 4 * 28.0, // 4行分を確保して長い質問文でも欠けないようにする
-                  child: Align(
-                    alignment: Alignment.topLeft,
-                    child: Text(
-                      _formatQuestionText(question.text),
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.zenOldMincho(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w500,
-                        height: 1.4,
-                      ),
-                      textAlign: TextAlign.left,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // 選択肢A (+1)
-                _buildChoiceButton(
-                  context: context,
-                  text: question.choiceA,
-                  isSelected: answer == 1,
-                  onPressed: () => _handleAnswer(1),
-                ),
-                const SizedBox(height: 16),
-
-                // 選択肢B (-1)
-                _buildChoiceButton(
-                  context: context,
-                  text: question.choiceB,
-                  isSelected: answer == -1,
-                  onPressed: () => _handleAnswer(-1),
-                ),
-
-                const Spacer(),
 
                 Padding(
                   padding: EdgeInsets.only(

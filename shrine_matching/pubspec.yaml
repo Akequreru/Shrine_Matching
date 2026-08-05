@@ -79,6 +79,7 @@ flutter:
   assets:
     - assets/logo.png
     - lib/assets/loading_ribbon.png
+    - lib/assets/ribbon.png
     - lib/assets/torii.png
     - lib/assets/maps.png
 

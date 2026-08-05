@@ -102,7 +102,7 @@ class _RootTabsPageState extends State<RootTabsPage>
   static const List<String?> _tabAssetIcons = [
     'lib/assets/torii.png',
     'lib/assets/maps.png',
-    'lib/assets/loading_ribbon.png',
+    'lib/assets/ribbon.png',
     null,
   ];
 
@@ -119,7 +119,69 @@ class _RootTabsPageState extends State<RootTabsPage>
   );
 
   Timer? _scrollIdleTimer;
+  Timer? _autoHideResumeTimer;
   int _currentIndex = 0;
+  int _barShowRequestId = 0;
+  bool _temporarilyDisableAutoHide = false;
+
+  void _temporarilyKeepBottomBarVisible({
+    Duration duration = const Duration(seconds: 2),
+  }) {
+    _autoHideResumeTimer?.cancel();
+
+    if (!_temporarilyDisableAutoHide && mounted) {
+      setState(() {
+        _temporarilyDisableAutoHide = true;
+      });
+    }
+
+    _autoHideResumeTimer = Timer(duration, () {
+      if (!mounted || !_temporarilyDisableAutoHide) {
+        return;
+      }
+      setState(() {
+        _temporarilyDisableAutoHide = false;
+      });
+    });
+  }
+
+  void _ensureBottomBarVisibleAfterTabChange({bool forceVisible = false}) {
+    if (!mounted) {
+      return;
+    }
+
+    if (forceVisible) {
+      RootBottomBarVisibility.show();
+    }
+
+    _temporarilyKeepBottomBarVisible();
+
+    final int requestId = ++_barShowRequestId;
+
+    void showIfStillRelevant() {
+      if (!mounted || requestId != _barShowRequestId) {
+        return;
+      }
+      if (!RootBottomBarVisibility.isVisible.value) {
+        return;
+      }
+      _bottomBarController.show();
+    }
+
+    showIfStillRelevant();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showIfStillRelevant();
+    });
+
+    // Route pops and tab/body swaps can emit late scroll updates that briefly
+    // re-hide the bar. Retry a few times across the transition window.
+    for (final int delayMs in <int>[120, 260, 420, 680, 960]) {
+      Future<void>.delayed(Duration(milliseconds: delayMs), () {
+        showIfStillRelevant();
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -143,7 +205,7 @@ class _RootTabsPageState extends State<RootTabsPage>
       return;
     }
     if (RootBottomBarVisibility.isVisible.value) {
-      _bottomBarController.show();
+      _ensureBottomBarVisibleAfterTabChange(forceVisible: false);
     } else {
       _bottomBarController.hide();
     }
@@ -174,15 +236,7 @@ class _RootTabsPageState extends State<RootTabsPage>
       });
     }
 
-    if (RootBottomBarVisibility.isVisible.value) {
-      _bottomBarController.show();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !RootBottomBarVisibility.isVisible.value) {
-          return;
-        }
-        _bottomBarController.show();
-      });
-    }
+    _ensureBottomBarVisibleAfterTabChange(forceVisible: true);
   }
 
   @override
@@ -231,6 +285,11 @@ class _RootTabsPageState extends State<RootTabsPage>
 
   void _onTabPressed(int index) {
     RootTabSelection.select(index);
+  }
+
+  bool _shouldEnableAutoHideForCurrentTab() {
+    return _currentIndex == RootTabSelection.map ||
+        _currentIndex == RootTabSelection.profile;
   }
 
   Widget _buildTabIcon(int index, bool isSelected) {
@@ -295,6 +354,7 @@ class _RootTabsPageState extends State<RootTabsPage>
   @override
   void dispose() {
     _scrollIdleTimer?.cancel();
+    _autoHideResumeTimer?.cancel();
     RootBottomBarVisibility.isVisible.removeListener(
       _handleBottomBarVisibilityChanged,
     );
@@ -346,8 +406,10 @@ class _RootTabsPageState extends State<RootTabsPage>
           duration: Duration(milliseconds: 360),
           slideStart: Offset(0, 2.2),
         ),
-        scrollBehavior: const BottomBarScrollBehavior(
-          hideOnScroll: true,
+        scrollBehavior: BottomBarScrollBehavior(
+          hideOnScroll:
+              !_temporarilyDisableAutoHide &&
+              _shouldEnableAutoHideForCurrentTab(),
           reverse: true,
           deltaThreshold: 14,
         ),
