@@ -1,6 +1,6 @@
 {
-    "name": "shrine_matching",
-    "short_name": "shrine_matching",
+    "name": "神縁サーチ",
+    "short_name": "神縁サーチ",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
