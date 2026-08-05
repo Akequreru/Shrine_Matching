@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
 // ユーザー名の後ろにこのドメインを付けた「疑似メールアドレス」でFirebase Authを利用する。
@@ -65,7 +66,24 @@ class AuthService {
     await _auth.signOut();
   }
 
+  Future<void> _deleteUserStorageFiles(String uid) async {
+    // アバター画像などUsers/{uid}配下に置かれたファイルを削除する。
+    // 何もアップロードしていないユーザーではフォルダ自体が存在しないので、
+    // その場合はlistAll()が空を返すだけで問題ない。
+    try {
+      final userStorageRef = FirebaseStorage.instance.ref('Users/$uid');
+      final result = await userStorageRef.listAll();
+      await Future.wait(result.items.map((item) => item.delete()));
+    } on FirebaseException catch (e) {
+      // object-not-foundなど致命的でないエラーでアカウント削除自体を止めたくないので、
+      // ログだけ残して先へ進む
+      debugPrint('Storage上のユーザーファイル削除に失敗しました: $e');
+    }
+  }
+
   Future<void> _deleteUserData(String uid) async {
+    await _deleteUserStorageFiles(uid);
+
     // FirestoreはドキュメントごとサブコレクションのHistoryを自動削除してくれないので、先に消しておく
     final userRef = _db.collection('Users').doc(uid);
     final historySnapshot = await userRef.collection('History').get();
