@@ -26,7 +26,7 @@ async function main() {
     const lat = parseFloat(row[2]);
     const lng = parseFloat(row[3]);
     const description = (row[8] || '').trim();
-    const tags = row.slice(9).map((t) => (t || '').trim()).filter(Boolean);
+    const tags = row.slice(9, 17).map((t) => (t || '').trim()).filter(Boolean);
 
     if (!description && tags.length === 0) {
       skippedNoData++;
