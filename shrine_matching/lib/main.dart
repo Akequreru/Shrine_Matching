@@ -119,8 +119,31 @@ class _RootTabsPageState extends State<RootTabsPage>
   );
 
   Timer? _scrollIdleTimer;
+  Timer? _autoHideResumeTimer;
   int _currentIndex = 0;
   int _barShowRequestId = 0;
+  bool _temporarilyDisableAutoHide = false;
+
+  void _temporarilyKeepBottomBarVisible({
+    Duration duration = const Duration(seconds: 2),
+  }) {
+    _autoHideResumeTimer?.cancel();
+
+    if (!_temporarilyDisableAutoHide && mounted) {
+      setState(() {
+        _temporarilyDisableAutoHide = true;
+      });
+    }
+
+    _autoHideResumeTimer = Timer(duration, () {
+      if (!mounted || !_temporarilyDisableAutoHide) {
+        return;
+      }
+      setState(() {
+        _temporarilyDisableAutoHide = false;
+      });
+    });
+  }
 
   void _ensureBottomBarVisibleAfterTabChange({bool forceVisible = false}) {
     if (!mounted) {
@@ -130,6 +153,8 @@ class _RootTabsPageState extends State<RootTabsPage>
     if (forceVisible) {
       RootBottomBarVisibility.show();
     }
+
+    _temporarilyKeepBottomBarVisible();
 
     final int requestId = ++_barShowRequestId;
 
@@ -262,6 +287,11 @@ class _RootTabsPageState extends State<RootTabsPage>
     RootTabSelection.select(index);
   }
 
+  bool _shouldEnableAutoHideForCurrentTab() {
+    return _currentIndex == RootTabSelection.map ||
+        _currentIndex == RootTabSelection.profile;
+  }
+
   Widget _buildTabIcon(int index, bool isSelected) {
     final assetPath = _tabAssetIcons[index];
     final double size = isSelected ? 24 : 22;
@@ -324,6 +354,7 @@ class _RootTabsPageState extends State<RootTabsPage>
   @override
   void dispose() {
     _scrollIdleTimer?.cancel();
+    _autoHideResumeTimer?.cancel();
     RootBottomBarVisibility.isVisible.removeListener(
       _handleBottomBarVisibilityChanged,
     );
@@ -375,8 +406,10 @@ class _RootTabsPageState extends State<RootTabsPage>
           duration: Duration(milliseconds: 360),
           slideStart: Offset(0, 2.2),
         ),
-        scrollBehavior: const BottomBarScrollBehavior(
-          hideOnScroll: true,
+        scrollBehavior: BottomBarScrollBehavior(
+          hideOnScroll:
+              !_temporarilyDisableAutoHide &&
+              _shouldEnableAutoHideForCurrentTab(),
           reverse: true,
           deltaThreshold: 14,
         ),
