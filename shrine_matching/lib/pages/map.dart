@@ -12,6 +12,7 @@ import 'package:shrine_matching/services/crossing_task_handler.dart';
 import 'package:shrine_matching/services/firestore_service.dart';
 import 'package:shrine_matching/models/shrine.dart';
 import 'package:shrine_matching/pages/shrineInfo.dart';
+import 'package:shrine_matching/widgets/root_tab_selection.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -40,9 +41,21 @@ class _MapPageState extends State<MapPage> {
   @override
   void initState() {
     super.initState();
+    RootTabSelection.request.addListener(_handleRootTabSelectionRequested);
     _determinePosition();
     _loadShrines();
     _loadFavorites();
+  }
+
+  void _handleRootTabSelectionRequested() {
+    final request = RootTabSelection.request.value;
+    if (request == null) return;
+
+    // マップタブが選択されるたびに再取得することで、直前に診断・マッチングで
+    // 増えたお気に入り（＝ピンの色）をアプリ再起動なしで反映する
+    if (request.index == RootTabSelection.map) {
+      _loadFavorites();
+    }
   }
 
   Future<void> _loadShrines() async {
@@ -212,6 +225,7 @@ class _MapPageState extends State<MapPage> {
 
   @override
   void dispose() {
+    RootTabSelection.request.removeListener(_handleRootTabSelectionRequested);
     _positionSubscription?.cancel();
     super.dispose();
   }
